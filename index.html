@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#060912">
+<title>Frida</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   ROOT
+═══════════════════════════════════════════ */
+:root {
+  --safe-top: env(safe-area-inset-top, 44px);
+  --safe-bottom: env(safe-area-inset-bottom, 20px);
+  --bg-deep: #060912;
+  --glass-fill: rgba(255,255,255,0.07);
+  --glass-fill-md: rgba(255,255,255,0.12);
+  --glass-fill-hi: rgba(255,255,255,0.20);
+  --glass-border: rgba(255,255,255,0.14);
+  --glass-border-hi: rgba(255,255,255,0.30);
+  --glass-blur: blur(32px) saturate(1.9) brightness(1.05);
+  --text-1: rgba(255,255,255,0.95);
+  --text-2: rgba(255,255,255,0.55);
+  --text-3: rgba(255,255,255,0.30);
+  --font-ui: 'Figtree', sans-serif;
+  --font-display: 'Playfair Display', serif;
+  --r-card: 22px;
+  --r-pill: 50px;
+  --mode-ambient:  #3b7ef8;
+  --mode-regulate: #2ec4a9;
+  --mode-calm:     #9b74f0;
+  --mode-launch:   #f87c3b;
+  --mode-bio:      #f84b7a;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font-ui);background:var(--bg-deep);color:var(--text-1);touch-action:manipulation;user-select:none;-webkit-user-select:none}
+
+/* ═══════════════════════════════════════════
+   ATMOSPHERE
+═══════════════════════════════════════════ */
+#atmo{position:fixed;inset:0;z-index:0;transition:all 2.5s ease}
+.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.28;transition:all 3s cubic-bezier(.4,0,.2,1)}
+#o1{width:380px;height:380px;top:-100px;left:-80px;background:radial-gradient(circle,#1a3a8a,transparent)}
+#o2{width:300px;height:300px;top:25%;right:-90px;background:radial-gradient(circle,#2a1060,transparent)}
+#o3{width:400px;height:400px;bottom:-120px;left:5%;background:radial-gradient(circle,#0d3a56,transparent)}
+#o4{width:220px;height:220px;top:50%;left:35%;background:radial-gradient(circle,#1a4a3a,transparent);opacity:.18}
+#atmo::after{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");opacity:.7;pointer-events:none}
+
+/* ═══════════════════════════════════════════
+   STATUS BAR
+═══════════════════════════════════════════ */
+#sb{position:fixed;top:0;left:0;right:0;height:calc(var(--safe-top) + 8px);display:flex;align-items:flex-end;justify-content:space-between;padding:0 22px 8px;z-index:200}
+.sb-time{font-size:15px;font-weight:600;letter-spacing:-.3px}
+.sb-icons{display:flex;gap:5px;align-items:center;font-size:11px;font-weight:600}
+#sb-hr-badge{background:rgba(248,75,122,.25);border:1px solid rgba(248,75,122,.45);border-radius:8px;padding:2px 7px;font-size:11px;font-weight:700;color:#f84b7a;display:none;animation:fadeIn .4s ease}
+
+/* ═══════════════════════════════════════════
+   APP SHELL
+═══════════════════════════════════════════ */
+#app{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;padding-top:calc(var(--safe-top) + 14px);padding-bottom:calc(var(--safe-bottom) + 76px)}
+
+/* ═══════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════ */
+#hdr{padding:10px 20px 12px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+#avatar{width:50px;height:50px;border-radius:50%;background:var(--glass-fill-md);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1.5px solid var(--glass-border-hi);display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;transition:box-shadow .4s,border-color .4s}
+#avatar.pulse{animation:pulse-ring 2s ease-in-out infinite;border-color:var(--mode-ambient)}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(59,126,248,.5)}70%{box-shadow:0 0 0 14px rgba(59,126,248,0)}100%{box-shadow:0 0 0 0 rgba(59,126,248,0)}}
+#hdr-text{flex:1}
+#hdr-text h1{font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-.5px;line-height:1}
+#hdr-text .sub{font-size:11px;color:var(--text-2);margin-top:3px;letter-spacing:.2px}
+#key-btn{background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:10px;padding:7px 11px;color:var(--text-2);font-family:var(--font-ui);font-size:11px;font-weight:500;cursor:pointer;transition:all .2s}
+#key-btn:active{opacity:.7}
+
+/* ═══════════════════════════════════════════
+   MODE BAR
+═══════════════════════════════════════════ */
+#mode-bar{display:flex;gap:7px;padding:0 20px 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-shrink:0}
+#mode-bar::-webkit-scrollbar{display:none}
+.mpill{display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:var(--r-pill);background:var(--glass-fill);border:1px solid var(--glass-border);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;white-space:nowrap;transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;letter-spacing:.2px}
+.mpill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5;transition:opacity .2s,transform .2s}
+.mpill.active{color:var(--text-1)}
+.mpill.active .dot{opacity:1;transform:scale(1.4)}
+.mpill[data-m="ambient"].active {background:rgba(59,126,248,.18);border-color:rgba(59,126,248,.5)}
+.mpill[data-m="regulate"].active{background:rgba(46,196,169,.18);border-color:rgba(46,196,169,.5)}
+.mpill[data-m="calm"].active    {background:rgba(155,116,240,.18);border-color:rgba(155,116,240,.5)}
+.mpill[data-m="launch"].active  {background:rgba(248,124,59,.18);border-color:rgba(248,124,59,.5)}
+.mpill[data-m="bio"].active     {background:rgba(248,75,122,.18);border-color:rgba(248,75,122,.5)}
+
+/* ═══════════════════════════════════════════
+   SCROLL CONTENT
+═══════════════════════════════════════════ */
+#scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 20px}
+#scroll::-webkit-scrollbar{display:none}
+
+/* ═══════════════════════════════════════════
+   GLASS CARD
+═══════════════════════════════════════════ */
+.gc{background:var(--glass-fill);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--r-card);position:relative;overflow:hidden;box-shadow:0 10px 36px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.1);margin-bottom:14px;transition:all .3s ease}
+.gc::before{content:'';position:absolute;top:0;left:0;right:0;height:44%;background:linear-gradient(to bottom,rgba(255,255,255,.09) 0%,transparent 100%);border-radius:var(--r-card) var(--r-card) 0 0;pointer-events:none}
+.gc-p{padding:18px 18px}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-3);margin-bottom:10px}
+
+/* ═══════════════════════════════════════════
+   MODE PANELS
+═══════════════════════════════════════════ */
+.panel{display:none;animation:panelIn .38s cubic-bezier(.34,1.2,.64,1) both}
+.panel.active{display:block}
+@keyframes panelIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+/* ─── FRIDA RESPONSE ─── */
+#frida-resp{background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:18px;padding:14px 16px;font-size:14px;line-height:1.6;color:var(--text-1);display:none;animation:fadeUp .4s ease both;margin-bottom:12px}
+#frida-resp.show{display:block}
+.fr-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-3);text-transform:uppercase;margin-bottom:7px}
+.dots{display:inline-flex;gap:4px;align-items:center}
+.dots span{width:6px;height:6px;border-radius:50%;background:var(--text-3);animation:db 1.2s ease-in-out infinite}
+.dots span:nth-child(2){animation-delay:.2s}
+.dots span:nth-child(3){animation-delay:.4s}
+@keyframes db{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+
+/* ─── AMBIENT ─── */
+.listen-core{padding:28px 20px 22px;text-align:center}
+#mic-orb{width:130px;height:130px;border-radius:50%;background:var(--glass-fill-md);border:1.5px solid var(--glass-border-hi);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:46px;position:relative;cursor:pointer;transition:all .3s ease}
+#mic-orb::before{content:'';position:absolute;inset:-10px;border-radius:50%;border:1px solid rgba(59,126,248,.2);animation:ring 3s ease-in-out infinite}
+#mic-orb::after{content:'';position:absolute;inset:-22px;border-radius:50%;border:1px solid rgba(59,126,248,.1);animation:ring 3s ease-in-out infinite .5s}
+@keyframes ring{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
+#mic-orb.on{background:rgba(59,126,248,.22);border-color:rgba(59,126,248,.6);box-shadow:0 0 60px rgba(59,126,248,.28);animation:mpulse 1.2s ease-in-out infinite}
+@keyframes mpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.ls-status{font-size:14px;font-weight:500;color:var(--text-2);margin-bottom:5px}
+.ls-hint{font-size:12px;color:var(--text-3)}
+#tfeed{padding:0 16px 16px;display:flex;flex-direction:column;gap:9px}
+.tbub{background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:14px;padding:11px 14px;font-size:13px;line-height:1.5;animation:fadeUp .4s ease both}
+.tbub.commit{border-color:rgba(46,196,169,.4);background:rgba(46,196,169,.09)}
+.tbub .tm{font-size:10px;color:var(--text-3);margin-bottom:4px;display:flex;justify-content:space-between;text-transform:uppercase;letter-spacing:.8px}
+.tbub.commit .tm{color:#2ec4a9}
+
+/* ─── REGULATE ─── */
+.reg-greeting{font-family:var(--font-display);font-size:19px;font-weight:700;margin-bottom:3px}
+.reg-snap{font-size:12px;color:var(--text-2)}
+.next-card{padding:14px 16px;margin-bottom:12px;border-left:3px solid var(--mode-regulate);border-radius:0 14px 14px 0;background:rgba(46,196,169,.08);border-top:1px solid rgba(46,196,169,.18);border-right:1px solid rgba(46,196,169,.1);border-bottom:1px solid rgba(46,196,169,.1)}
+.nc-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;color:#2ec4a9;margin-bottom:5px;text-transform:uppercase}
+.nc-title{font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:2px}
+.nc-time{font-size:11px;color:var(--text-2)}
+.task{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:opacity .2s}
+.task:last-child{border-bottom:none}
+.task:active{opacity:.6}
+.tck{width:21px;height:21px;border-radius:50%;border:1.5px solid var(--glass-border-hi);background:var(--glass-fill);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .2s}
+.task.done .tck{background:rgba(46,196,169,.3);border-color:#2ec4a9}
+.task.done .tck::after{content:'✓';color:#2ec4a9;font-weight:700}
+.task.done .ttxt{text-decoration:line-through;opacity:.4}
+.ttxt{font-size:13px;font-weight:500;flex:1;line-height:1.3}
+.ttime{font-size:10px;color:var(--text-3);flex-shrink:0}
+
+/* ─── CALM ─── */
+.calm-top{padding:28px 20px 20px;text-align:center}
+.calm-orb{width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,rgba(155,116,240,.35) 0%,transparent 70%);border:1px solid rgba(155,116,240,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:42px;animation:cbreathe 5s ease-in-out infinite;box-shadow:0 0 40px rgba(155,116,240,.18)}
+@keyframes cbreathe{0%,100%{transform:scale(1);box-shadow:0 0 40px rgba(155,116,240,.18)}50%{transform:scale(1.08);box-shadow:0 0 60px rgba(155,116,240,.32)}}
+.calm-msg{font-family:var(--font-display);font-size:20px;font-weight:400;font-style:italic;color:var(--text-1);line-height:1.4;margin-bottom:7px}
+.calm-sub{font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:20px}
+.breathe-row{display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:24px}
+.bbar{width:36px;height:4px;border-radius:2px;background:rgba(155,116,240,.25);overflow:hidden;position:relative}
+.bbar::after{content:'';position:absolute;inset:0;border-radius:2px;background:#9b74f0;transform:scaleX(0);transform-origin:left;animation:bfill 5s ease-in-out infinite}
+.bbar:nth-child(2)::after{animation-delay:.15s}
+.bbar:nth-child(3)::after{animation-delay:.3s}
+.bbar:nth-child(4)::after{animation-delay:.45s}
+@keyframes bfill{0%,100%{transform:scaleX(0)}40%,60%{transform:scaleX(1)}}
+.blbl{font-size:10px;color:var(--text-3);letter-spacing:1px;text-transform:uppercase}
+.calm-chat{padding:0 16px 16px;display:flex;flex-direction:column;gap:9px}
+.cbub{padding:13px 15px;border-radius:16px;font-size:13px;line-height:1.55;animation:fadeUp .4s ease both}
+.cbub.f{background:rgba(155,116,240,.14);border:1px solid rgba(155,116,240,.22);border-radius:16px 16px 16px 4px}
+.cbub.u{background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:16px 16px 4px 16px;text-align:right}
+
+/* ─── LAUNCH ─── */
+.launch-top{padding:24px 20px 18px;text-align:center}
+.l-icon{font-size:52px;margin-bottom:14px;animation:lbounce 2s ease-in-out infinite}
+@keyframes lbounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.l-q{font-family:var(--font-display);font-size:21px;font-weight:700;color:var(--text-1);line-height:1.3;margin-bottom:7px}
+.l-sub{font-size:13px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
+.one-card{background:rgba(248,124,59,.11);border:1px solid rgba(248,124,59,.28);border-radius:18px;padding:18px;margin-bottom:18px;text-align:left;position:relative;overflow:hidden}
+.one-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(248,124,59,.6),transparent)}
+.one-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;color:#f87c3b;text-transform:uppercase;margin-bottom:7px}
+.one-txt{font-size:17px;font-weight:600;color:var(--text-1);line-height:1.4}
+.lstep{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.lstep:last-child{border-bottom:none}
+.snum{width:22px;height:22px;border-radius:50%;background:rgba(248,124,59,.2);border:1px solid rgba(248,124,59,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#f87c3b;flex-shrink:0}
+.stxt{font-size:13px;color:var(--text-1);line-height:1.4;flex:1;padding-top:2px}
+
+/* ═══════════════════════════════════════════
+   BIOMETRICS PANEL (5th mode)
+═══════════════════════════════════════════ */
+/* Top vitals row */
+.bio-vitals{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.vital-card{background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:18px;padding:16px;position:relative;overflow:hidden;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:0 8px 24px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.1)}
+.vital-card::before{content:'';position:absolute;top:0;left:0;right:0;height:45%;background:linear-gradient(to bottom,rgba(255,255,255,.08),transparent);border-radius:18px 18px 0 0;pointer-events:none}
+.vital-card.alert{border-color:rgba(248,75,122,.45);background:rgba(248,75,122,.1)}
+.vital-card.good {border-color:rgba(46,196,169,.35);background:rgba(46,196,169,.07)}
+.vital-card.warn {border-color:rgba(248,180,0,.35);background:rgba(248,180,0,.07)}
+.vc-icon{font-size:20px;margin-bottom:7px}
+.vc-lbl{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-3);margin-bottom:3px}
+.vc-val{font-size:28px;font-weight:700;color:var(--text-1);letter-spacing:-1px;line-height:1}
+.vc-unit{font-size:11px;color:var(--text-2);margin-top:2px}
+.vc-trend{font-size:10px;margin-top:5px;font-weight:600}
+.vc-trend.up{color:#f84b7a}
+.vc-trend.down{color:#2ec4a9}
+.vc-trend.stable{color:var(--text-3)}
+
+/* Stress ring */
+.stress-ring-wrap{display:flex;flex-direction:column;align-items:center;padding:20px;gap:14px}
+.ring-container{position:relative;width:150px;height:150px}
+.ring-container svg{transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:10}
+.ring-fill{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1),stroke .6s ease}
+.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-val{font-size:36px;font-weight:700;color:var(--text-1);letter-spacing:-1.5px;line-height:1}
+.ring-sub{font-size:11px;color:var(--text-2);margin-top:2px}
+.stress-lbl{font-size:18px;font-weight:700;color:var(--text-1)}
+.stress-desc{font-size:13px;color:var(--text-2);text-align:center;line-height:1.5;max-width:240px}
+
+/* HR chart */
+.hr-chart-wrap{padding:16px 18px}
+.hr-chart{width:100%;height:80px;position:relative;overflow:hidden}
+.hr-chart canvas{width:100%!important;height:80px!important}
+
+/* Connection panel */
+.conn-panel{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.conn-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;background:var(--glass-fill);border:1px solid var(--glass-border);cursor:pointer;transition:all .2s}
+.conn-row:active{opacity:.7}
+.conn-icon{font-size:22px;flex-shrink:0}
+.conn-info{flex:1}
+.conn-name{font-size:14px;font-weight:600;color:var(--text-1)}
+.conn-desc{font-size:11px;color:var(--text-2);margin-top:2px}
+.conn-status{font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;flex-shrink:0}
+.conn-status.connected{background:rgba(46,196,169,.2);color:#2ec4a9;border:1px solid rgba(46,196,169,.3)}
+.conn-status.ready{background:rgba(59,126,248,.15);color:#3b7ef8;border:1px solid rgba(59,126,248,.25)}
+.conn-status.off{background:var(--glass-fill);color:var(--text-3);border:1px solid var(--glass-border)}
+
+/* FDP log */
+.fdp-log{padding:12px 18px 16px;display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto}
+.fdp-log::-webkit-scrollbar{display:none}
+.fdp-entry{font-size:11px;color:var(--text-2);font-family:monospace;background:rgba(255,255,255,.04);border-radius:6px;padding:5px 9px;letter-spacing:.3px;border-left:2px solid transparent}
+.fdp-entry.hr{border-left-color:#f84b7a;color:rgba(248,75,122,.9)}
+.fdp-entry.hrv{border-left-color:#3b7ef8;color:rgba(59,126,248,.9)}
+.fdp-entry.stress{border-left-color:#f87c3b;color:rgba(248,124,59,.9)}
+.fdp-entry.ble{border-left-color:#2ec4a9;color:rgba(46,196,169,.9)}
+.fdp-entry.sys{border-left-color:rgba(255,255,255,.2);color:var(--text-3)}
+
+/* Threshold editor */
+.thresh-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.thresh-row:last-child{border-bottom:none}
+.thresh-lbl{font-size:13px;color:var(--text-1);flex:1}
+.thresh-val{font-size:13px;font-weight:700;color:var(--text-1);width:46px;text-align:center}
+.thresh-btn{width:30px;height:30px;border-radius:50%;background:var(--glass-fill-md);border:1px solid var(--glass-border);color:var(--text-1);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-ui);transition:all .15s;-webkit-appearance:none}
+.thresh-btn:active{transform:scale(.88)}
+
+/* Stress alert banner */
+#stress-alert{position:fixed;top:calc(var(--safe-top) + 60px);left:16px;right:16px;z-index:300;background:rgba(248,75,122,.18);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(248,75,122,.5);border-radius:18px;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(248,75,122,.2);transform:translateY(-120%);transition:transform .5s cubic-bezier(.34,1.2,.64,1);pointer-events:none}
+#stress-alert.show{transform:translateY(0);pointer-events:all}
+.sa-icon{font-size:24px;flex-shrink:0}
+.sa-text{flex:1}
+.sa-title{font-size:14px;font-weight:700;color:#f84b7a}
+.sa-sub{font-size:12px;color:var(--text-2);margin-top:2px}
+.sa-btn{background:rgba(248,75,122,.25);border:1px solid rgba(248,75,122,.4);border-radius:10px;color:#f84b7a;font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer;font-family:var(--font-ui);white-space:nowrap;-webkit-appearance:none}
+
+/* ═══════════════════════════════════════════
+   INPUT BAR
+═══════════════════════════════════════════ */
+#ibar{position:fixed;bottom:0;left:0;right:0;padding:10px 14px calc(var(--safe-bottom) + 10px);background:rgba(6,9,18,.82);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);border-top:1px solid var(--glass-border);z-index:100;display:flex;align-items:center;gap:9px}
+#txt-in{flex:1;background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:20px;padding:10px 15px;font-family:var(--font-ui);font-size:14px;color:var(--text-1);outline:none;-webkit-appearance:none;caret-color:var(--mode-ambient);transition:border-color .2s}
+#txt-in::placeholder{color:var(--text-3)}
+#txt-in:focus{border-color:var(--glass-border-hi)}
+.ibtn{width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;transition:all .2s;-webkit-appearance:none}
+.ibtn:active{transform:scale(.88)}
+#mic-btn{background:var(--glass-fill-md);border:1px solid var(--glass-border);color:var(--text-2)}
+#mic-btn.rec{background:rgba(59,126,248,.25);border-color:rgba(59,126,248,.6);color:white;animation:mpulse 1.2s ease-in-out infinite}
+#send-btn{background:linear-gradient(135deg,rgba(59,126,248,.8),rgba(59,126,248,.45));border:1px solid rgba(59,126,248,.5);color:white;box-shadow:0 4px 14px rgba(59,126,248,.22)}
+
+/* ═══════════════════════════════════════════
+   API KEY MODAL
+═══════════════════════════════════════════ */
+#key-modal{position:fixed;inset:0;z-index:400;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .3s}
+#key-modal.open{opacity:1;pointer-events:all}
+.ksheet{background:rgba(10,14,28,.96);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);border:1px solid var(--glass-border-hi);border-radius:26px 26px 0 0;padding:26px 22px calc(var(--safe-bottom) + 26px);width:100%;max-width:480px;transform:translateY(100%);transition:transform .4s cubic-bezier(.34,1.2,.64,1)}
+#key-modal.open .ksheet{transform:translateY(0)}
+.ksheet h2{font-family:var(--font-display);font-size:21px;font-weight:700;margin-bottom:5px;color:var(--text-1)}
+.ksheet p{font-size:13px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
+#ki{width:100%;padding:13px 15px;background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:14px;font-family:var(--font-ui);font-size:13px;color:var(--text-1);outline:none;margin-bottom:11px;-webkit-appearance:none;letter-spacing:.4px}
+#ki::placeholder{color:var(--text-3)}
+#ki:focus{border-color:var(--glass-border-hi)}
+.ksave{width:100%;padding:13px;background:linear-gradient(135deg,rgba(59,126,248,.7),rgba(59,126,248,.4));border:1px solid rgba(59,126,248,.5);border-radius:14px;font-family:var(--font-ui);font-size:15px;font-weight:600;color:white;cursor:pointer;-webkit-appearance:none;transition:all .2s}
+.ksave:active{transform:scale(.97);opacity:.85}
+.knote{font-size:11px;color:var(--text-3);text-align:center;margin-top:9px;line-height:1.5}
+
+/* ═══════════════════════════════════════════
+   SHORTCUTS GUIDE MODAL
+═══════════════════════════════════════════ */
+#sc-modal{position:fixed;inset:0;z-index:400;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .3s}
+#sc-modal.open{opacity:1;pointer-events:all}
+.sc-sheet{background:rgba(10,14,28,.96);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);border:1px solid var(--glass-border-hi);border-radius:26px 26px 0 0;padding:26px 22px calc(var(--safe-bottom) + 26px);width:100%;max-width:480px;transform:translateY(100%);transition:transform .4s cubic-bezier(.34,1.2,.64,1);max-height:80vh;overflow-y:auto}
+#sc-modal.open .sc-sheet{transform:translateY(0)}
+.sc-sheet h2{font-family:var(--font-display);font-size:20px;font-weight:700;margin-bottom:14px}
+.sc-step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
+.sc-num{width:24px;height:24px;border-radius:50%;background:rgba(59,126,248,.2);border:1px solid rgba(59,126,248,.4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#3b7ef8;flex-shrink:0;margin-top:1px}
+.sc-txt{font-size:13px;color:var(--text-1);line-height:1.5;flex:1}
+.sc-txt code{background:rgba(255,255,255,.1);border-radius:5px;padding:1px 6px;font-size:12px;font-family:monospace;color:#3b7ef8;word-break:break-all}
+.sc-close{width:100%;padding:12px;background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:14px;font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--text-1);cursor:pointer;-webkit-appearance:none;margin-top:10px}
+
+/* UTIL */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.spc{height:14px}
+
+/* ═══════════════════════════════════════════
+   PROVIDER CHOOSER
+═══════════════════════════════════════════ */
+#provider-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px}
+.prov-card{background:var(--glass-fill);border:1.5px solid var(--glass-border);border-radius:16px;padding:13px 12px;cursor:pointer;transition:all .25s cubic-bezier(.34,1.2,.64,1);text-align:center}
+.prov-card:active{transform:scale(.94)}
+.prov-card.active{background:rgba(59,126,248,.16);border-color:rgba(59,126,248,.55);box-shadow:0 0 16px rgba(59,126,248,.18)}
+.prov-card[data-p="gemini"].active {background:rgba(66,133,244,.16);border-color:rgba(66,133,244,.55)}
+.prov-card[data-p="groq"].active   {background:rgba(249,200,0,.12);border-color:rgba(249,200,0,.45)}
+.prov-card[data-p="openai"].active {background:rgba(16,163,127,.14);border-color:rgba(16,163,127,.45)}
+.prov-logo{font-size:22px;margin-bottom:5px}
+.prov-name{font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:2px}
+.prov-sub{font-size:10px;color:var(--text-2);margin-bottom:3px}
+.prov-cost{font-size:10px;font-weight:600;color:#2ec4a9}
+.prov-hint-box{font-size:12px;color:var(--text-2);background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:10px;padding:9px 12px;margin-bottom:10px;line-height:1.5;min-height:38px}
+</style>
+</head>
+<body>
+
+<div id="atmo">
+  <div class="orb" id="o1"></div>
+  <div class="orb" id="o2"></div>
+  <div class="orb" id="o3"></div>
+  <div class="orb" id="o4"></div>
+</div>
+
+<!-- Status Bar -->
+<div id="sb">
+  <div class="sb-time" id="sbt">9:41</div>
+  <div class="sb-icons">
+    <div id="sb-hr-badge">♥ --</div>
+    <span>5G</span><span>📶</span><span>🔋</span>
+  </div>
+</div>
+
+<!-- Stress Alert Banner -->
+<div id="stress-alert">
+  <div class="sa-icon">💗</div>
+  <div class="sa-text">
+    <div class="sa-title">Elevated Stress Detected</div>
+    <div class="sa-sub" id="sa-sub">Heart rate elevated. Frida is here.</div>
+  </div>
+  <button class="sa-btn" onclick="handleStressAlert()">Breathe →</button>
+</div>
+
+<!-- App -->
+<div id="app">
+  <div id="hdr">
+    <div id="avatar">🌸</div>
+    <div id="hdr-text">
+      <h1>Frida</h1>
+      <div class="sub" id="hdr-sub">Your executive function, amplified</div>
+    </div>
+    <button id="key-btn" onclick="openKeyModal()">API Key</button>
+  </div>
+
+  <div id="mode-bar">
+    <div class="mpill active" data-m="ambient"  onclick="setMode('ambient')"><div class="dot" style="color:#3b7ef8"></div>👂 Listen</div>
+    <div class="mpill"        data-m="regulate" onclick="setMode('regulate')"><div class="dot" style="color:#2ec4a9"></div>📋 Regulate</div>
+    <div class="mpill"        data-m="calm"     onclick="setMode('calm')"><div class="dot" style="color:#9b74f0"></div>🧘 Calm</div>
+    <div class="mpill"        data-m="launch"   onclick="setMode('launch')"><div class="dot" style="color:#f87c3b"></div>🚀 Launch</div>
+    <div class="mpill"        data-m="bio"      onclick="setMode('bio')" id="bio-pill"><div class="dot" style="color:#f84b7a"></div>💗 Bio</div>
+  </div>
+
+  <div id="scroll">
+
+    <!-- Frida response -->
+    <div id="frida-resp">
+      <div class="fr-lbl">Frida</div>
+      <div id="fr-txt"></div>
+    </div>
+
+    <!-- ══ AMBIENT ══ -->
+    <div class="panel active" id="p-ambient">
+      <div class="gc">
+        <div class="listen-core">
+          <div id="mic-orb" onclick="toggleListen()">🎙️</div>
+          <div class="ls-status" id="ls-stat">Tap to start listening</div>
+          <div class="ls-hint" id="ls-hint">Frida catches commitments, names & times</div>
+        </div>
+      </div>
+      <div class="gc">
+        <div class="gc-p" style="padding-bottom:6px"><div class="sec-label">Caught This Session</div></div>
+        <div id="tfeed">
+          <div class="tbub commit">
+            <div class="tm"><span>⚡ EXAMPLE</span><span>now</span></div>
+            <span style="font-size:12px;opacity:.6">"Call the school at 3pm"</span><br>
+            <span style="font-size:13px">Commitment logged: Call school · 3:00 PM · Priority: high</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ REGULATE ══ -->
+    <div class="panel" id="p-regulate">
+      <div class="gc">
+        <div class="gc-p" style="padding-bottom:10px">
+          <div class="reg-greeting" id="reg-greet">Good morning, Jeff</div>
+          <div class="reg-snap" id="reg-snap">Here's what needs your attention</div>
+        </div>
+        <div class="gc-p" style="padding-top:0">
+          <div class="next-card" id="next-card">
+            <div class="nc-lbl">⚡ Next Up</div>
+            <div class="nc-title" id="nc-title">Nothing scheduled yet</div>
+            <div class="nc-time"  id="nc-time">Tell Frida what's on your plate</div>
+          </div>
+          <div class="sec-label">Today's Commitments</div>
+          <div id="task-list"></div>
+        </div>
+      </div>
+      <div class="gc gc-p">
+        <div class="sec-label">Ask Frida</div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.6">Try: "What should I do first?" · "Add: call dentist tomorrow at 10" · "I'm overwhelmed, pick one thing"</div>
+      </div>
+    </div>
+
+    <!-- ══ CALM ══ -->
+    <div class="panel" id="p-calm">
+      <div class="gc">
+        <div class="calm-top">
+          <div class="calm-orb">🌊</div>
+          <div class="calm-msg" id="calm-msg">"You don't have to do everything right now."</div>
+          <div class="calm-sub" id="calm-sub">Breathe with me for a moment. Your nervous system is processing a lot.</div>
+          <div class="breathe-row">
+            <span class="blbl">Breathe</span>
+            <div class="bbar"></div><div class="bbar"></div><div class="bbar"></div><div class="bbar"></div>
+          </div>
+        </div>
+      </div>
+      <div class="gc">
+        <div class="gc-p" style="padding-bottom:6px"><div class="sec-label">Talk to Frida</div></div>
+        <div class="calm-chat" id="calm-chat">
+          <div class="cbub f">I'm here. What's going on? You don't have to sort it out — just say it.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ LAUNCH ══ -->
+    <div class="panel" id="p-launch">
+      <div class="gc">
+        <div class="launch-top">
+          <div class="l-icon">🚀</div>
+          <div class="l-q">What's the one thing?</div>
+          <div class="l-sub">You don't need a whole plan. Just the very next physical action.</div>
+          <div class="one-card">
+            <div class="one-lbl">⚡ Your One Thing</div>
+            <div class="one-txt" id="one-txt">Ask Frida: "Help me pick one thing to start with"</div>
+          </div>
+        </div>
+      </div>
+      <div class="gc gc-p">
+        <div class="sec-label">Breaking It Down</div>
+        <div id="lsteps">
+          <div class="lstep"><div class="snum">1</div><div class="stxt">Tell Frida what you're trying to do — even vaguely</div></div>
+          <div class="lstep"><div class="snum">2</div><div class="stxt">She finds the single smallest physical next action</div></div>
+          <div class="lstep"><div class="snum">3</div><div class="stxt">Do just that — nothing else counts right now</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ BIO DASHBOARD ══ -->
+    <div class="panel" id="p-bio">
+
+      <!-- Vitals row -->
+      <div class="bio-vitals">
+        <div class="vital-card" id="vc-hr">
+          <div class="vc-icon">💗</div>
+          <div class="vc-lbl">Heart Rate</div>
+          <div class="vc-val" id="vv-hr">--</div>
+          <div class="vc-unit">BPM</div>
+          <div class="vc-trend" id="vt-hr">— No data</div>
+        </div>
+        <div class="vital-card" id="vc-hrv">
+          <div class="vc-icon">〰️</div>
+          <div class="vc-lbl">HRV</div>
+          <div class="vc-val" id="vv-hrv">--</div>
+          <div class="vc-unit">ms RMSSD</div>
+          <div class="vc-trend" id="vt-hrv">— No data</div>
+        </div>
+        <div class="vital-card" id="vc-spo2">
+          <div class="vc-icon">🫁</div>
+          <div class="vc-lbl">SpO₂</div>
+          <div class="vc-val" id="vv-spo2">--</div>
+          <div class="vc-unit">% Oxygen</div>
+          <div class="vc-trend" id="vt-spo2">— No data</div>
+        </div>
+        <div class="vital-card" id="vc-stress">
+          <div class="vc-icon">🧠</div>
+          <div class="vc-lbl">Stress</div>
+          <div class="vc-val" id="vv-stress">--</div>
+          <div class="vc-unit">/ 100</div>
+          <div class="vc-trend" id="vt-stress">— No data</div>
+        </div>
+      </div>
+
+      <!-- Stress ring -->
+      <div class="gc" style="margin-bottom:14px">
+        <div class="stress-ring-wrap">
+          <div class="ring-container">
+            <svg width="150" height="150" viewBox="0 0 150 150">
+              <circle class="ring-bg" cx="75" cy="75" r="60"/>
+              <circle class="ring-fill" id="stress-ring" cx="75" cy="75" r="60"
+                stroke="#2ec4a9"
+                stroke-dasharray="377"
+                stroke-dashoffset="377"/>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-val" id="ring-val">0</div>
+              <div class="ring-sub">Stress</div>
+            </div>
+          </div>
+          <div class="stress-lbl" id="stress-state">Awaiting Data</div>
+          <div class="stress-desc" id="stress-desc">Connect a device below or use the Apple Shortcuts bridge to start streaming biometric data.</div>
+        </div>
+      </div>
+
+      <!-- HR Sparkline -->
+      <div class="gc" style="margin-bottom:14px">
+        <div class="gc-p" style="padding-bottom:8px"><div class="sec-label">Heart Rate History</div></div>
+        <div class="hr-chart-wrap">
+          <div class="hr-chart"><canvas id="hr-canvas"></canvas></div>
+        </div>
+        <div style="padding:8px 18px 14px;display:flex;justify-content:space-between">
+          <span style="font-size:11px;color:var(--text-3)">Threshold: <span id="thresh-display" style="color:var(--mode-bio);font-weight:700">100</span> BPM</span>
+          <span style="font-size:11px;color:var(--text-3)" id="hr-last-update">No readings yet</span>
+        </div>
+      </div>
+
+      <!-- Device connections -->
+      <div class="gc" style="margin-bottom:14px">
+        <div class="gc-p" style="padding-bottom:6px"><div class="sec-label">Device Bridge</div></div>
+        <div class="conn-panel">
+
+          <div class="conn-row" onclick="openShortcutsGuide()">
+            <div class="conn-icon">⌚</div>
+            <div class="conn-info">
+              <div class="conn-name">Apple Watch · Shortcuts Bridge</div>
+              <div class="conn-desc">iOS Shortcuts → FDP HTTP endpoint</div>
+            </div>
+            <div class="conn-status" id="aw-status" style="background:rgba(59,126,248,.15);color:#3b7ef8;border:1px solid rgba(59,126,248,.25)">Setup →</div>
+          </div>
+
+          <div class="conn-row" id="ble-row" onclick="connectBLE()">
+            <div class="conn-icon">🔵</div>
+            <div class="conn-info">
+              <div class="conn-name">Samsung Galaxy Watch · BLE</div>
+              <div class="conn-desc">Web Bluetooth — tap to scan nearby devices</div>
+            </div>
+            <div class="conn-status off" id="ble-status">Scan</div>
+          </div>
+
+          <div class="conn-row" onclick="injectDemo()">
+            <div class="conn-icon">🎛️</div>
+            <div class="conn-info">
+              <div class="conn-name">Demo Mode</div>
+              <div class="conn-desc">Simulate live biometric stream</div>
+            </div>
+            <div class="conn-status ready" id="demo-status">Start</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Thresholds -->
+      <div class="gc" style="margin-bottom:14px">
+        <div class="gc-p" style="padding-bottom:6px"><div class="sec-label">Alert Thresholds</div></div>
+        <div style="padding:0 18px 14px">
+          <div class="thresh-row">
+            <div class="thresh-lbl">💗 HR Alert (BPM)</div>
+            <button class="thresh-btn" onclick="adjThresh('hr',-5)">−</button>
+            <div class="thresh-val" id="thr-hr">100</div>
+            <button class="thresh-btn" onclick="adjThresh('hr',+5)">+</button>
+          </div>
+          <div class="thresh-row">
+            <div class="thresh-lbl">🧠 Stress Alert (/100)</div>
+            <button class="thresh-btn" onclick="adjThresh('stress',-5)">−</button>
+            <div class="thresh-val" id="thr-stress">65</div>
+            <button class="thresh-btn" onclick="adjThresh('stress',+5)">+</button>
+          </div>
+          <div class="thresh-row">
+            <div class="thresh-lbl">〰️ HRV Low Alert (ms)</div>
+            <button class="thresh-btn" onclick="adjThresh('hrv',-5)">−</button>
+            <div class="thresh-val" id="thr-hrv">20</div>
+            <button class="thresh-btn" onclick="adjThresh('hrv',+5)">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FDP Live Log -->
+      <div class="gc" style="margin-bottom:14px">
+        <div class="gc-p" style="padding-bottom:6px">
+          <div class="sec-label">FDP Live Log
+            <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3);font-size:9px"> · Frida Device Protocol v1.1</span>
+          </div>
+        </div>
+        <div class="fdp-log" id="fdp-log">
+          <div class="fdp-entry sys">[FDP v1.1] Frida Device Protocol initialized</div>
+          <div class="fdp-entry sys">[FDP v1.1] Awaiting device connection...</div>
+        </div>
+      </div>
+
+    </div><!-- /p-bio -->
+
+    <div class="spc"></div>
+  </div><!-- /scroll -->
+</div><!-- /app -->
+
+<!-- Input Bar -->
+<div id="ibar">
+  <button class="ibtn" id="mic-btn" onclick="toggleVoice()">🎙️</button>
+  <input type="text" id="txt-in" placeholder="Talk to Frida..." autocomplete="off" autocorrect="on" spellcheck="true">
+  <button class="ibtn" id="send-btn" onclick="sendMsg()">↑</button>
+</div>
+
+<!-- Multi-Provider Key Modal -->
+<div id="key-modal">
+  <div class="ksheet">
+    <h2>Connect Frida's Brain</h2>
+    <p>Choose your AI provider. Your key is stored only on this device — never sent anywhere except directly to your chosen provider.</p>
+
+    <!-- Provider Selector -->
+    <div id="provider-grid">
+      <div class="prov-card active" data-p="anthropic" onclick="selectProvider('anthropic')">
+        <div class="prov-logo">🟠</div>
+        <div class="prov-name">Claude</div>
+        <div class="prov-sub">Anthropic · Best quality</div>
+        <div class="prov-cost">~$5 credit to start</div>
+      </div>
+      <div class="prov-card" data-p="gemini" onclick="selectProvider('gemini')">
+        <div class="prov-logo">🔵</div>
+        <div class="prov-name">Gemini</div>
+        <div class="prov-sub">Google · Free tier</div>
+        <div class="prov-cost">Free up to 15 RPM</div>
+      </div>
+      <div class="prov-card" data-p="groq" onclick="selectProvider('groq')">
+        <div class="prov-logo">⚡</div>
+        <div class="prov-name">Groq</div>
+        <div class="prov-sub">Groq Cloud · Very fast</div>
+        <div class="prov-cost">Free tier available</div>
+      </div>
+      <div class="prov-card" data-p="openai" onclick="selectProvider('openai')">
+        <div class="prov-logo">🟢</div>
+        <div class="prov-name">GPT-4o</div>
+        <div class="prov-sub">OpenAI · Reliable</div>
+        <div class="prov-cost">Pay per use</div>
+      </div>
+    </div>
+
+    <!-- Key input — label changes per provider -->
+    <div id="prov-hint" class="prov-hint-box"></div>
+    <input type="password" id="ki" placeholder="Paste your API key..." autocomplete="off">
+    <button class="ksave" onclick="saveKey()">Activate Frida</button>
+    <div class="knote" id="prov-link-note"></div>
+  </div>
+</div>
+
+<!-- Shortcuts Setup Guide -->
+<div id="sc-modal">
+  <div class="sc-sheet">
+    <h2>⌚ Apple Watch Bridge Setup</h2>
+    <div class="sc-step"><div class="sc-num">1</div><div class="sc-txt">On your iPhone, open the <strong>Shortcuts</strong> app and create a new Automation: <em>When Heart Rate rises above X</em> (or on a repeating timer).</div></div>
+    <div class="sc-step"><div class="sc-num">2</div><div class="sc-txt">Add a <strong>Get My Heart Rate</strong> action to read the current value from HealthKit.</div></div>
+    <div class="sc-step"><div class="sc-num">3</div><div class="sc-txt">Add a <strong>Get Contents of URL</strong> action. Set method to <code>POST</code>, URL to your Frida deployment URL + <code>/fdp</code> (e.g. <code>https://your-frida.netlify.app/fdp</code>). Set body type to JSON.</div></div>
+    <div class="sc-step"><div class="sc-num">4</div><div class="sc-txt">Set the JSON body to:<br><code>{"device":"apple_watch","metric":"hr","value": [Shortcut Variable: Heart Rate], "timestamp": [Shortcut Variable: Current Date]}</code></div></div>
+    <div class="sc-step"><div class="sc-num">5</div><div class="sc-txt">Run the Shortcut manually once to test. Frida's FDP log will show the incoming reading. After confirming, set the automation to run every 1–5 minutes.</div></div>
+    <div class="sc-step"><div class="sc-num">6</div><div class="sc-txt"><strong>Alternative (no server):</strong> Tap <em>Demo Mode</em> on the Bio dashboard to simulate live data right now, or manually POST to Frida's <code>window.FDP.ingest()</code> from any automation tool.</div></div>
+    <button class="sc-close" onclick="closeShortcutsGuide()">Got it</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const S = {
+  mode: 'ambient',
+  apiKey: localStorage.getItem('frida_key') || '',
+  provider: localStorage.getItem('frida_provider') || 'anthropic',
+  listening: false,
+  voiceActive: false,
+  recognition: null,
+  conversation: [],
+  tasks: JSON.parse(localStorage.getItem('frida_tasks') || '[]'),
+  commitments: JSON.parse(localStorage.getItem('frida_commits') || '[]'),
+  bio: {
+    hr: null, hrv: null, spo2: null, stress: null,
+    hrHistory: [],
+    alertFired: false,
+    demoInterval: null,
+    bleDevice: null,
+    bleChar: null,
+  },
+  thresholds: JSON.parse(localStorage.getItem('frida_thresh') || '{"hr":100,"stress":65,"hrv":20}'),
+};
+
+const MODE_RGB = {
+  ambient:  [59,126,248],
+  regulate: [46,196,169],
+  calm:     [155,116,240],
+  launch:   [248,124,59],
+  bio:      [248,75,122],
+};
+
+const FRIDA_SYSTEM = `You are Frida — a calm, deeply intelligent personal AI for Jeff, who has ADHD. You are his executive function support, Chief of Staff, and calm voice in the storm.
+
+Core traits:
+- Warm but efficient — no wasted words, never cold
+- Deep understanding of ADHD: time blindness, task paralysis, emotional dysregulation, rejection sensitivity
+- NEVER lecture, shame, or overwhelm — one thing at a time, always
+- You catch commitments from conversation and tag them with [[COMMITMENT: description | time | priority: high/medium/low]]
+- In calm mode: grounding presence, de-escalate gently, no task lists
+- In regulate mode: surface most important thing, ruthlessly prioritize, break paralysis
+- In launch mode: ONE single smallest physical next action — never a list
+- In ambient mode: note commitments, times, names
+- In bio mode: interpret biometric readings with ADHD-specific insight (stress + ADHD dysregulation connection, HRV and emotional regulation, etc.)
+
+Bio context: Jeff has ADHD. Elevated HR + low HRV often signals nervous system dysregulation, not just physical exertion. Frame biometric insights through this lens.
+
+Keep responses SHORT on mobile. 2-4 sentences max unless asked for more.`;
+
+// ═══════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════
+function tick() {
+  const n = new Date();
+  document.getElementById('sbt').textContent =
+    `${n.getHours().toString().padStart(2,'0')}:${n.getMinutes().toString().padStart(2,'0')}`;
+  const g = ['Good night','Good night','Good night','Good night','Good night','Good morning','Good morning','Good morning','Good morning','Good morning','Good morning','Good morning','Good afternoon','Good afternoon','Good afternoon','Good afternoon','Good afternoon','Good evening','Good evening','Good evening','Good evening','Good night','Good night','Good night'];
+  document.getElementById('reg-greet').textContent = `${g[n.getHours()]}, Jeff`;
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('reg-snap').textContent = `${days[n.getDay()]}, ${months[n.getMonth()]} ${n.getDate()} · Your commitments`;
+}
+setInterval(tick, 1000); tick();
+
+// ═══════════════════════════════════════════
+// MODE
+// ═══════════════════════════════════════════
+function setMode(m) {
+  S.mode = m;
+  document.querySelectorAll('.mpill').forEach(p => p.classList.toggle('active', p.dataset.m === m));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `p-${m}`));
+
+  const [r,g,b] = MODE_RGB[m];
+  document.getElementById('o1').style.background = `radial-gradient(circle,rgba(${r},${g},${b},.5),transparent)`;
+  document.getElementById('o2').style.background = `radial-gradient(circle,rgba(${Math.round(r*.5)},${Math.round(g*.3)},${b},.4),transparent)`;
+
+  const subs = { ambient:'Listening for what matters', regulate:'Keeping you on track', calm:'Here when it feels like too much', launch:'Breaking through the freeze', bio:'Your nervous system, visible' };
+  document.getElementById('hdr-sub').textContent = subs[m];
+
+  const sb = document.getElementById('send-btn');
+  sb.style.background = `linear-gradient(135deg,rgba(${r},${g},${b},.8),rgba(${r},${g},${b},.4))`;
+  sb.style.borderColor = `rgba(${r},${g},${b},.5)`;
+  sb.style.boxShadow = `0 4px 14px rgba(${r},${g},${b},.22)`;
+
+  const ph = { ambient:"Tell Frida anything you want to remember...", regulate:"What's on your plate today?", calm:"What's going on right now?", launch:"What are you trying to get done?", bio:"Ask Frida about your biometrics..." };
+  document.getElementById('txt-in').placeholder = ph[m];
+
+  document.getElementById('avatar').classList.toggle('pulse', m === 'ambient' && S.listening);
+}
+
+// ═══════════════════════════════════════════
+// LISTEN
+// ═══════════════════════════════════════════
+function toggleListen() {
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    fridaSay("Your browser doesn't support voice. Try Chrome on Android."); return;
+  }
+  S.listening ? stopListen() : startListen();
+}
+
+function startListen() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  S.recognition = new SR();
+  S.recognition.continuous = true; S.recognition.interimResults = true; S.recognition.lang = 'en-US';
+  S.recognition.onstart = () => {
+    S.listening = true;
+    document.getElementById('mic-orb').classList.add('on');
+    document.getElementById('mic-orb').textContent = '🔴';
+    document.getElementById('ls-stat').textContent = 'Listening...';
+    document.getElementById('ls-hint').textContent = 'Speak naturally — Frida is catching everything';
+    document.getElementById('avatar').classList.add('pulse');
+  };
+  let final = '';
+  S.recognition.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      e.results[i].isFinal ? (final += e.results[i][0].transcript + ' ') : (interim = e.results[i][0].transcript);
+    }
+    document.getElementById('ls-stat').textContent = interim || 'Listening...';
+    if (final.length > 20) { processAmbient(final.trim()); final = ''; }
+  };
+  S.recognition.onerror = stopListen;
+  S.recognition.onend = () => { if (S.listening) S.recognition.start(); };
+  S.recognition.start();
+}
+
+function stopListen() {
+  S.listening = false;
+  if (S.recognition) S.recognition.stop();
+  document.getElementById('mic-orb').classList.remove('on');
+  document.getElementById('mic-orb').textContent = '🎙️';
+  document.getElementById('ls-stat').textContent = 'Tap to start listening';
+  document.getElementById('ls-hint').textContent = 'Frida catches commitments, names & times';
+  document.getElementById('avatar').classList.remove('pulse');
+}
+
+async function processAmbient(text) {
+  if (!S.apiKey) return;
+  const r = await callFrida(`Passively heard: "${text}"\nBriefly (1-2 sentences) acknowledge if relevant, extract any commitments. If nothing notable, just say "Got it."`, false);
+  if (r) { const c = parseCommits(r); if (c && c.length > 4) addTBubble(text, c); }
+}
+
+function addTBubble(heard, note) {
+  const feed = document.getElementById('tfeed');
+  const now = new Date();
+  const t = `${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
+  const isC = note.toLowerCase().includes('commit') || note.toLowerCase().includes('logged');
+  const el = document.createElement('div');
+  el.className = `tbub${isC?' commit':''}`;
+  el.innerHTML = `<div class="tm"><span>${isC?'⚡ COMMITMENT CAUGHT':'👂 HEARD'}</span><span>${t}</span></div><strong style="font-size:12px;opacity:.6">"${heard.substring(0,80)}${heard.length>80?'...':''}"</strong><br><span style="font-size:13px;display:block;margin-top:4px">${note}</span>`;
+  feed.insertBefore(el, feed.firstChild);
+}
+
+// ═══════════════════════════════════════════
+// VOICE INPUT
+// ═══════════════════════════════════════════
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    document.getElementById('txt-in').focus(); return;
+  }
+  if (S.voiceActive) {
+    if (S.recognition) S.recognition.stop();
+    S.voiceActive = false;
+    document.getElementById('mic-btn').classList.remove('rec');
+    document.getElementById('mic-btn').textContent = '🎙️';
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR(); rec.continuous = false; rec.interimResults = true; rec.lang = 'en-US';
+  S.voiceActive = true;
+  document.getElementById('mic-btn').classList.add('rec');
+  document.getElementById('mic-btn').textContent = '⏹️';
+  rec.onresult = e => { let t=''; for (let i=0;i<e.results.length;i++) t+=e.results[i][0].transcript; document.getElementById('txt-in').value = t; };
+  rec.onend = () => {
+    S.voiceActive = false;
+    document.getElementById('mic-btn').classList.remove('rec');
+    document.getElementById('mic-btn').textContent = '🎙️';
+    if (document.getElementById('txt-in').value.trim()) sendMsg();
+  };
+  rec.onerror = () => { S.voiceActive = false; document.getElementById('mic-btn').classList.remove('rec'); document.getElementById('mic-btn').textContent = '🎙️'; };
+  rec.start(); S.recognition = rec;
+}
+
+// ═══════════════════════════════════════════
+// SEND MESSAGE
+// ═══════════════════════════════════════════
+async function sendMsg() {
+  const inp = document.getElementById('txt-in');
+  const text = inp.value.trim(); if (!text) return;
+  if (!S.apiKey) { openKeyModal(); return; }
+  inp.value = '';
+
+  let ctx = '';
+  if (S.mode === 'regulate') {
+    const tl = S.tasks.map(t=>`- ${t.text}${t.done?' (done)':''}`).join('\n') || 'none';
+    ctx = `Mode: REGULATE. Task list:\n${tl}\n\n`;
+  } else if (S.mode === 'calm') {
+    ctx = 'Mode: CALM. Be grounding, short, warm, no task lists. ';
+  } else if (S.mode === 'launch') {
+    ctx = 'Mode: LAUNCH. Task paralysis. Give ONE single smallest physical next action only. Be decisive. ';
+  } else if (S.mode === 'bio') {
+    const b = S.bio;
+    ctx = `Mode: BIO. Current readings — HR: ${b.hr??'unknown'} BPM, HRV: ${b.hrv??'unknown'} ms, SpO2: ${b.spo2??'unknown'}%, Stress: ${b.stress??'unknown'}/100. Interpret through ADHD dysregulation lens. `;
+  }
+
+  showThinking();
+  const r = await callFrida(ctx + text, true);
+  if (!r) return;
+  const clean = parseCommits(r);
+  fridaSay(clean);
+
+  if (S.mode === 'launch') document.getElementById('one-txt').textContent = clean.split(/[.!?]/)[0].trim() || clean;
+  else if (S.mode === 'calm') { addCalmBubble(text, clean); }
+  else if (S.mode === 'regulate' && /add|remind|forget/i.test(text)) addTask(text.replace(/^(add|remind me to|don't forget to?)\s*/i,''));
+
+  speak(clean);
+}
+
+// ═══════════════════════════════════════════
+// MULTI-PROVIDER AI ROUTER
+// ═══════════════════════════════════════════
+const PROVIDERS = {
+  anthropic: {
+    name: 'Claude', model: 'claude-sonnet-4-20250514',
+    hint: 'Anthropic key starts with sk-ant- · Get one at console.anthropic.com',
+    link: 'console.anthropic.com',
+    placeholder: 'sk-ant-api03-...',
+    validate: k => k.startsWith('sk-ant-'),
+  },
+  gemini: {
+    name: 'Gemini', model: 'gemini-1.5-flash',
+    hint: 'Free tier available · Get key at aistudio.google.com · Starts with AIza',
+    link: 'aistudio.google.com',
+    placeholder: 'AIzaSy...',
+    validate: k => k.startsWith('AIza') || k.length > 20,
+  },
+  groq: {
+    name: 'Groq', model: 'llama-3.3-70b-versatile',
+    hint: 'Free tier — very fast · Get key at console.groq.com · Starts with gsk_',
+    link: 'console.groq.com',
+    placeholder: 'gsk_...',
+    validate: k => k.startsWith('gsk_') || k.length > 20,
+  },
+  openai: {
+    name: 'GPT-4o', model: 'gpt-4o-mini',
+    hint: 'Pay per use · Get key at platform.openai.com · Starts with sk-',
+    link: 'platform.openai.com',
+    placeholder: 'sk-proj-...',
+    validate: k => k.startsWith('sk-') || k.length > 20,
+  },
+};
+
+async function callFrida(userText, history) {
+  if (history) S.conversation.push({ role:'user', content:userText });
+  const msgs = history ? S.conversation.slice(-12) : [{ role:'user', content:userText }];
+  const prov = PROVIDERS[S.provider];
+
+  try {
+    let reply = '';
+
+    if (S.provider === 'anthropic') {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'x-api-key':S.apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+        body: JSON.stringify({ model: prov.model, max_tokens:500, system:FRIDA_SYSTEM, messages:msgs })
+      });
+      if (!res.ok) { const e=await res.json(); fridaSay(`Claude error: ${e.error?.message||res.status}`); return null; }
+      const d = await res.json();
+      reply = d.content?.[0]?.text || '';
+
+    } else if (S.provider === 'gemini') {
+      const geminiMsgs = msgs.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts:[{text: m.content}] }));
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${prov.model}:generateContent?key=${S.apiKey}`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ system_instruction:{parts:[{text:FRIDA_SYSTEM}]}, contents: geminiMsgs, generationConfig:{maxOutputTokens:500} })
+      });
+      if (!res.ok) { const e=await res.json(); fridaSay(`Gemini error: ${e.error?.message||res.status}`); return null; }
+      const d = await res.json();
+      reply = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    } else if (S.provider === 'groq') {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.apiKey}`},
+        body: JSON.stringify({ model: prov.model, max_tokens:500, messages:[{role:'system',content:FRIDA_SYSTEM},...msgs] })
+      });
+      if (!res.ok) { const e=await res.json(); fridaSay(`Groq error: ${e.error?.message||res.status}`); return null; }
+      const d = await res.json();
+      reply = d.choices?.[0]?.message?.content || '';
+
+    } else if (S.provider === 'openai') {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.apiKey}`},
+        body: JSON.stringify({ model: prov.model, max_tokens:500, messages:[{role:'system',content:FRIDA_SYSTEM},...msgs] })
+      });
+      if (!res.ok) { const e=await res.json(); fridaSay(`OpenAI error: ${e.error?.message||res.status}`); return null; }
+      const d = await res.json();
+      reply = d.choices?.[0]?.message?.content || '';
+    }
+
+    if (history && reply) S.conversation.push({ role:'assistant', content:reply });
+    return reply || null;
+
+  } catch(e) {
+    fridaSay('Connection error. Check your network and API key.');
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════
+// COMMITMENT PARSER
+// ═══════════════════════════════════════════
+function parseCommits(text) {
+  const rx = /\[\[COMMITMENT:\s*([^|]+)\|?\s*([^|]*)\|?\s*priority:\s*(high|medium|low)\s*\]\]/gi;
+  let clean = text, m;
+  while ((m = rx.exec(text)) !== null) {
+    const t = { id:Date.now()+Math.random(), text:m[1].trim(), time:m[2].trim()||null, priority:m[3], done:false };
+    S.tasks.unshift(t); S.commitments.unshift(t);
+    clean = clean.replace(m[0],'').trim();
+  }
+  if (S.tasks.length) { localStorage.setItem('frida_tasks',JSON.stringify(S.tasks)); localStorage.setItem('frida_commits',JSON.stringify(S.commitments)); renderTasks(); updateNext(); }
+  return clean;
+}
+
+// ═══════════════════════════════════════════
+// TASKS
+// ═══════════════════════════════════════════
+function addTask(text) {
+  const t = { id:Date.now(), text:text.trim(), done:false, priority:'medium', time:null };
+  S.tasks.unshift(t); localStorage.setItem('frida_tasks',JSON.stringify(S.tasks)); renderTasks(); updateNext();
+}
+function toggleTask(id) {
+  const t = S.tasks.find(t=>t.id===id); if (t) { t.done=!t.done; localStorage.setItem('frida_tasks',JSON.stringify(S.tasks)); renderTasks(); updateNext(); }
+}
+function renderTasks() {
+  const el = document.getElementById('task-list');
+  const show = S.tasks.slice(0,8);
+  if (!show.length) { el.innerHTML='<div style="font-size:13px;color:var(--text-3);padding:8px 0">No tasks yet. Tell Frida what\'s on your plate.</div>'; return; }
+  el.innerHTML = show.map(t=>`<div class="task ${t.done?'done':''}" onclick="toggleTask(${t.id})"><div class="tck"></div><div class="ttxt">${esc(t.text)}</div><div class="ttime">${t.time||''}</div></div>`).join('');
+}
+function updateNext() {
+  const n = S.tasks.find(t=>!t.done&&t.priority==='high') || S.tasks.find(t=>!t.done);
+  if (n) { document.getElementById('nc-title').textContent = n.text; document.getElementById('nc-time').textContent = n.time||'When you\'re ready'; }
+}
+
+// ═══════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════
+function showThinking() {
+  const el = document.getElementById('frida-resp'); el.classList.add('show');
+  document.getElementById('fr-txt').innerHTML = '<div class="fr-lbl">Frida</div><div class="dots"><span></span><span></span><span></span></div>';
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function fridaSay(text) {
+  const el = document.getElementById('frida-resp'); el.classList.add('show');
+  document.getElementById('fr-txt').innerHTML = `<div class="fr-lbl">Frida</div>${esc(text)}`;
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function addCalmBubble(u,f) {
+  const c = document.getElementById('calm-chat');
+  const ub = document.createElement('div'); ub.className='cbub u'; ub.textContent=u; c.appendChild(ub);
+  const fb = document.createElement('div'); fb.className='cbub f'; fb.textContent=f; c.appendChild(fb);
+  fb.scrollIntoView({behavior:'smooth'});
+}
+function speak(t) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(t.substring(0,180)); u.rate=.92; u.pitch=1.05; u.volume=.85;
+  const vs = window.speechSynthesis.getVoices();
+  const v = vs.find(v=>v.name.includes('Samantha')||v.name.includes('Karen')||v.name.includes('Moira')||(v.lang==='en-US'&&v.name.includes('Google')));
+  if (v) u.voice=v;
+  window.speechSynthesis.speak(u);
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ═══════════════════════════════════════════
+// API KEY
+// ═══════════════════════════════════════════
+function openKeyModal() { document.getElementById('key-modal').classList.add('open'); setTimeout(()=>document.getElementById('ki').focus(),400); }
+function saveKey() {
+  const k = document.getElementById('ki').value.trim();
+  if (!k.startsWith('sk-ant-')) { document.getElementById('ki').style.borderColor='rgba(248,100,100,.6)'; return; }
+  S.apiKey = k; localStorage.setItem('frida_key',k);
+  document.getElementById('key-btn').textContent = '✓ Active'; document.getElementById('key-btn').style.color = '#2ec4a9';
+  document.getElementById('key-modal').classList.remove('open');
+  setTimeout(()=>{ callFrida(`Jeff just opened Frida. Greet him warmly in 2 sentences. It's ${new Date().getHours()<12?'morning':new Date().getHours()<17?'afternoon':'evening'}.`,true).then(r=>{ if(r){ fridaSay(parseCommits(r)); speak(r); }}); },500);
+}
+document.getElementById('key-modal').addEventListener('click',e=>{ if(e.target===document.getElementById('key-modal')) document.getElementById('key-modal').classList.remove('open'); });
+
+// ═══════════════════════════════════════════
+// FDP — FRIDA DEVICE PROTOCOL v1.1
+// ═══════════════════════════════════════════
+window.FDP = {
+  ingest(payload) {
+    // payload: { device, metric, value, timestamp?, hrv?, spo2? }
+    const ts = new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    fdpLog(`[${ts}] ${payload.device} · ${payload.metric}: ${payload.value}`, payload.metric);
+
+    if (payload.metric === 'hr' || payload.metric === 'heart_rate') {
+      updateBioHR(Number(payload.value));
+    }
+    if (payload.metric === 'hrv') updateBioHRV(Number(payload.value));
+    if (payload.metric === 'spo2') updateBioSPO2(Number(payload.value));
+    if (payload.metric === 'stress') updateBioStress(Number(payload.value));
+
+    // Full packet with multiple metrics
+    if (payload.hr)     updateBioHR(Number(payload.hr));
+    if (payload.hrv)    updateBioHRV(Number(payload.hrv));
+    if (payload.spo2)   updateBioSPO2(Number(payload.spo2));
+    if (payload.stress) updateBioStress(Number(payload.stress));
+  }
+};
+
+function fdpLog(msg, type='sys') {
+  const log = document.getElementById('fdp-log');
+  const el = document.createElement('div'); el.className=`fdp-entry ${type}`; el.textContent=msg;
+  log.insertBefore(el, log.firstChild);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+// ═══════════════════════════════════════════
+// BIO DATA UPDATERS
+// ═══════════════════════════════════════════
+function updateBioHR(val) {
+  S.bio.hr = val;
+  S.bio.hrHistory.push({ t: Date.now(), v: val });
+  if (S.bio.hrHistory.length > 60) S.bio.hrHistory.shift();
+
+  const el = document.getElementById('vc-hr');
+  document.getElementById('vv-hr').textContent = val;
+  document.getElementById('sb-hr-badge').textContent = `♥ ${val}`;
+  document.getElementById('sb-hr-badge').style.display = 'block';
+  document.getElementById('hr-last-update').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+
+  const prev = S.bio.hrHistory.length > 1 ? S.bio.hrHistory[S.bio.hrHistory.length-2].v : val;
+  const diff = val - prev;
+  const trend = document.getElementById('vt-hr');
+
+  el.className = 'vital-card';
+  if (val >= S.thresholds.hr) {
+    el.classList.add('alert');
+    trend.className = 'vc-trend up'; trend.textContent = `↑ ${val >= S.thresholds.hr ? 'Above threshold' : 'Elevated'}`;
+    triggerStressAlert(val);
+  } else if (val < 60) {
+    el.classList.add('warn');
+    trend.className = 'vc-trend stable'; trend.textContent = '↓ Resting';
+  } else {
+    el.classList.add('good');
+    trend.className = 'vc-trend stable'; trend.textContent = diff > 0 ? `↑ ${diff} from last` : diff < 0 ? `↓ ${Math.abs(diff)} from last` : '→ Stable';
+  }
+
+  computeStress();
+  drawHRChart();
+}
+
+function updateBioHRV(val) {
+  S.bio.hrv = val;
+  document.getElementById('vv-hrv').textContent = val;
+  const el = document.getElementById('vc-hrv');
+  const trend = document.getElementById('vt-hrv');
+  el.className = 'vital-card';
+  if (val < S.thresholds.hrv) { el.classList.add('alert'); trend.className='vc-trend up'; trend.textContent='↓ Low — stress likely'; }
+  else if (val < 40) { el.classList.add('warn'); trend.className='vc-trend stable'; trend.textContent='→ Moderate'; }
+  else { el.classList.add('good'); trend.className='vc-trend down'; trend.textContent='↑ Healthy range'; }
+  computeStress();
+}
+
+function updateBioSPO2(val) {
+  S.bio.spo2 = val;
+  document.getElementById('vv-spo2').textContent = val;
+  const el = document.getElementById('vc-spo2');
+  const trend = document.getElementById('vt-spo2');
+  el.className = 'vital-card';
+  if (val < 94) { el.classList.add('alert'); trend.className='vc-trend up'; trend.textContent='↓ Low — breathe deeply'; }
+  else if (val < 97) { el.classList.add('warn'); trend.className='vc-trend stable'; trend.textContent='→ Slightly low'; }
+  else { el.classList.add('good'); trend.className='vc-trend down'; trend.textContent='✓ Normal'; }
+}
+
+function updateBioStress(val) {
+  S.bio.stress = val;
+  updateStressRing(val);
+  if (val >= S.thresholds.stress && !S.bio.alertFired) triggerStressAlert(null, val);
+}
+
+function computeStress() {
+  // Derive stress score from HR + HRV
+  let score = 0; let factors = 0;
+  if (S.bio.hr !== null) {
+    const hrScore = Math.min(100, Math.max(0, ((S.bio.hr - 60) / (S.thresholds.hr - 60)) * 80));
+    score += hrScore; factors++;
+  }
+  if (S.bio.hrv !== null) {
+    const hrvScore = Math.min(100, Math.max(0, (1 - (S.bio.hrv / 60)) * 100));
+    score += hrvScore; factors++;
+  }
+  if (factors > 0) {
+    S.bio.stress = Math.round(score / factors);
+    updateStressRing(S.bio.stress);
+    document.getElementById('vv-stress').textContent = S.bio.stress;
+    const el = document.getElementById('vc-stress');
+    const trend = document.getElementById('vt-stress');
+    el.className = 'vital-card';
+    if (S.bio.stress >= S.thresholds.stress) { el.classList.add('alert'); trend.className='vc-trend up'; trend.textContent='↑ Elevated'; }
+    else if (S.bio.stress >= 40) { el.classList.add('warn'); trend.className='vc-trend stable'; trend.textContent='→ Moderate'; }
+    else { el.classList.add('good'); trend.className='vc-trend down'; trend.textContent='✓ Regulated'; }
+  }
+}
+
+function updateStressRing(val) {
+  const ring = document.getElementById('stress-ring');
+  const circ = 2 * Math.PI * 60; // 377
+  const offset = circ - (val / 100) * circ;
+  ring.style.strokeDashoffset = offset;
+  document.getElementById('ring-val').textContent = val;
+
+  let color, state, desc;
+  if (val >= S.thresholds.stress) {
+    color = '#f84b7a'; state = '⚠️ Elevated Stress'; desc = 'Your nervous system is dysregulated. This is ADHD-common — you\'re not broken. Let Frida help you slow down.';
+  } else if (val >= 40) {
+    color = '#f87c3b'; state = '〰️ Moderate Load'; desc = 'Some activation present. Keep an eye on it. Try the Calm mode if things escalate.';
+  } else {
+    color = '#2ec4a9'; state = '✅ Regulated'; desc = 'Your nervous system looks good. Good window for focused work.';
+  }
+  ring.style.stroke = color;
+  document.getElementById('stress-state').textContent = state;
+  document.getElementById('stress-desc').textContent = desc;
+}
+
+// ═══════════════════════════════════════════
+// STRESS ALERT
+// ═══════════════════════════════════════════
+function triggerStressAlert(hr, stress) {
+  if (S.bio.alertFired) return;
+  S.bio.alertFired = true;
+  const banner = document.getElementById('stress-alert');
+  const sub = hr ? `HR at ${hr} BPM — above your ${S.thresholds.hr} BPM threshold.` : `Stress score ${stress}/100 — above your ${S.thresholds.stress} threshold.`;
+  document.getElementById('sa-sub').textContent = sub;
+  banner.classList.add('show');
+  // Auto-dismiss after 8s if not acted on
+  setTimeout(() => { banner.classList.remove('show'); setTimeout(()=>S.bio.alertFired=false, 30000); }, 8000);
+}
+
+function handleStressAlert() {
+  document.getElementById('stress-alert').classList.remove('show');
+  setMode('calm');
+  if (S.apiKey) {
+    const hr = S.bio.hr; const st = S.bio.stress;
+    callFrida(`Jeff's biometrics just triggered a stress alert. HR: ${hr||'unknown'} BPM, Stress score: ${st||'unknown'}/100. He just switched to Calm mode. Give him one short, grounding sentence.`, true)
+      .then(r => { if(r) { fridaSay(parseCommits(r)); speak(r); }});
+  }
+}
+
+// ═══════════════════════════════════════════
+// HR SPARKLINE CHART
+// ═══════════════════════════════════════════
+function drawHRChart() {
+  const canvas = document.getElementById('hr-canvas');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.offsetWidth; const h = 80;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const data = S.bio.hrHistory.slice(-40);
+  if (data.length < 2) return;
+
+  const vals = data.map(d=>d.v);
+  const min = Math.max(40, Math.min(...vals) - 5);
+  const max = Math.min(180, Math.max(...vals) + 5);
+  const pad = 6;
+  const chartW = w - pad*2; const chartH = h - pad*2;
+
+  const toX = i => pad + (i / (data.length-1)) * chartW;
+  const toY = v => pad + (1 - (v-min)/(max-min)) * chartH;
+
+  // Threshold line
+  ctx.beginPath();
+  ctx.setLineDash([4,4]);
+  ctx.strokeStyle = 'rgba(248,75,122,.35)';
+  ctx.lineWidth = 1;
+  const ty = toY(S.thresholds.hr);
+  if (ty >= pad && ty <= h-pad) { ctx.moveTo(pad, ty); ctx.lineTo(w-pad, ty); ctx.stroke(); }
+  ctx.setLineDash([]);
+
+  // Fill gradient
+  const grad = ctx.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0,'rgba(248,75,122,.25)');
+  grad.addColorStop(1,'rgba(248,75,122,0)');
+  ctx.beginPath();
+  ctx.moveTo(toX(0), h);
+  data.forEach((d,i) => i===0 ? ctx.lineTo(toX(i), toY(d.v)) : ctx.lineTo(toX(i), toY(d.v)));
+  ctx.lineTo(toX(data.length-1), h);
+  ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  data.forEach((d,i) => i===0 ? ctx.moveTo(toX(i), toY(d.v)) : ctx.lineTo(toX(i), toY(d.v)));
+  ctx.strokeStyle = '#f84b7a'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+
+  // Current dot
+  const last = data[data.length-1];
+  ctx.beginPath();
+  ctx.arc(toX(data.length-1), toY(last.v), 4, 0, Math.PI*2);
+  ctx.fillStyle = '#f84b7a'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+// ═══════════════════════════════════════════
+// THRESHOLDS
+// ═══════════════════════════════════════════
+function adjThresh(key, delta) {
+  S.thresholds[key] = Math.max(10, S.thresholds[key] + delta);
+  document.getElementById(`thr-${key}`).textContent = S.thresholds[key];
+  if (key === 'hr') document.getElementById('thresh-display').textContent = S.thresholds.hr;
+  localStorage.setItem('frida_thresh', JSON.stringify(S.thresholds));
+  S.bio.alertFired = false; // reset alert when threshold changes
+}
+
+// ═══════════════════════════════════════════
+// DEMO MODE
+// ═══════════════════════════════════════════
+function injectDemo() {
+  const btn = document.getElementById('demo-status');
+  if (S.bio.demoInterval) {
+    clearInterval(S.bio.demoInterval); S.bio.demoInterval = null;
+    btn.textContent = 'Start'; btn.style.background='rgba(59,126,248,.15)'; btn.style.color='#3b7ef8';
+    fdpLog('[DEMO] Stream stopped', 'sys'); return;
+  }
+  btn.textContent = 'Stop'; btn.style.background='rgba(248,75,122,.2)'; btn.style.color='#f84b7a';
+  fdpLog('[DEMO] Simulated stream started — Apple Watch · Galaxy Watch', 'ble');
+  setMode('bio');
+
+  let baseHR = 72; let baseHRV = 38; let trend = 0;
+  S.bio.demoInterval = setInterval(() => {
+    trend += (Math.random() - 0.48) * 3;
+    trend = Math.max(-15, Math.min(25, trend));
+    const hr  = Math.round(Math.max(50, Math.min(140, baseHR + trend + (Math.random()-0.5)*4)));
+    const hrv = Math.round(Math.max(8,  Math.min(80,  baseHRV - trend*0.4 + (Math.random()-0.5)*3)));
+    const spo2= Math.round(Math.max(94, Math.min(100, 98 + (Math.random()-0.5))));
+    window.FDP.ingest({ device: Math.random()>0.5?'apple_watch':'galaxy_watch', metric:'hr', value:hr, hr, hrv, spo2 });
+  }, 2000);
+}
+
+// ═══════════════════════════════════════════
+// WEB BLUETOOTH (Samsung Galaxy Watch)
+// ═══════════════════════════════════════════
+async function connectBLE() {
+  if (!navigator.bluetooth) {
+    fdpLog('[BLE] Web Bluetooth not available in this browser. Use Chrome on Android.', 'sys');
+    fridaSay("Web Bluetooth requires Chrome on Android. Make sure it's enabled in chrome://flags."); return;
+  }
+  fdpLog('[BLE] Scanning for Heart Rate service (0x180D)...', 'ble');
+  document.getElementById('ble-status').textContent = 'Scanning...';
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: ['heart_rate'] }],
+      optionalServices: ['battery_service', 'health_thermometer']
+    });
+    fdpLog(`[BLE] Connected: ${device.name}`, 'ble');
+    document.getElementById('ble-status').textContent = 'Connected'; document.getElementById('ble-status').className='conn-status connected';
+    document.getElementById('aw-status');
+    S.bio.bleDevice = device;
+
+    const server  = await device.gatt.connect();
+    const service = await server.getPrimaryService('heart_rate');
+    const char    = await service.getCharacteristic('heart_rate_measurement');
+    S.bio.bleChar = char;
+
+    await char.startNotifications();
+    char.addEventListener('characteristicvaluechanged', e => {
+      const val = e.target.value;
+      const flags = val.getUint8(0);
+      const hr = (flags & 0x01) ? val.getUint16(1, true) : val.getUint8(1);
+      // RR intervals for HRV (if available)
+      let hrv = null;
+      if (flags & 0x10) {
+        const rrOffset = (flags & 0x08) ? 5 : 3;
+        if (val.byteLength > rrOffset + 1) {
+          const rr = val.getUint16(rrOffset, true) / 1024 * 1000;
+          hrv = Math.round(rr * 0.4); // simplified RMSSD approximation
+        }
+      }
+      window.FDP.ingest({ device: device.name || 'galaxy_watch', metric:'hr', value:hr, hr, ...(hrv?{hrv}:{}) });
+    });
+
+    device.addEventListener('gattserverdisconnected', () => {
+      fdpLog(`[BLE] ${device.name} disconnected`, 'sys');
+      document.getElementById('ble-status').textContent='Scan'; document.getElementById('ble-status').className='conn-status off';
+    });
+    setMode('bio');
+  } catch(e) {
+    fdpLog(`[BLE] Error: ${e.message}`, 'sys');
+    document.getElementById('ble-status').textContent='Scan'; document.getElementById('ble-status').className='conn-status off';
+  }
+}
+
+// ═══════════════════════════════════════════
+// SHORTCUTS GUIDE
+// ═══════════════════════════════════════════
+function openShortcutsGuide()  { document.getElementById('sc-modal').classList.add('open'); }
+function closeShortcutsGuide() { document.getElementById('sc-modal').classList.remove('open'); }
+document.getElementById('sc-modal').addEventListener('click',e=>{ if(e.target===document.getElementById('sc-modal')) closeShortcutsGuide(); });
+
+// ═══════════════════════════════════════════
+// KEYBOARD
+// ═══════════════════════════════════════════
+document.getElementById('txt-in').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();sendMsg();} });
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+function init() {
+  renderTasks(); updateNext();
+  document.getElementById('thr-hr').textContent     = S.thresholds.hr;
+  document.getElementById('thr-stress').textContent  = S.thresholds.stress;
+  document.getElementById('thr-hrv').textContent     = S.thresholds.hrv;
+  document.getElementById('thresh-display').textContent = S.thresholds.hr;
+
+  if (S.apiKey) {
+    document.getElementById('key-btn').textContent = '✓ Active';
+    document.getElementById('key-btn').style.color = '#2ec4a9';
+  } else {
+    setTimeout(openKeyModal, 1200);
+  }
+
+  document.addEventListener('touchmove', e=>{
+    if (!e.target.closest('#scroll')&&!e.target.closest('#txt-in')&&!e.target.closest('.ksheet')&&!e.target.closest('.sc-sheet')) e.preventDefault();
+  }, { passive:false });
+
+  // PWA manifest
+  const mf = { name:"Frida", short_name:"Frida", description:"Your executive function, amplified", start_url:".", display:"fullscreen", orientation:"portrait", background_color:"#060912", theme_color:"#060912", icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%23060912'/%3E%3Ctext y='130' x='96' text-anchor='middle' font-size='110'%3E🌸%3C/text%3E%3C/svg%3E",sizes:"192x192",type:"image/svg+xml"}] };
+  const lk = document.createElement('link'); lk.rel='manifest'; lk.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:'application/json'})); document.head.appendChild(lk);
+}
+
+init();
+</script>
+</body>
+</html>
