@@ -1063,18 +1063,61 @@ function speak(t) {
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ═══════════════════════════════════════════
-// API KEY
+// PROVIDER CHOOSER + KEY MODAL
 // ═══════════════════════════════════════════
-function openKeyModal() { document.getElementById('key-modal').classList.add('open'); setTimeout(()=>document.getElementById('ki').focus(),400); }
-function saveKey() {
-  const k = document.getElementById('ki').value.trim();
-  if (!k.startsWith('sk-ant-')) { document.getElementById('ki').style.borderColor='rgba(248,100,100,.6)'; return; }
-  S.apiKey = k; localStorage.setItem('frida_key',k);
-  document.getElementById('key-btn').textContent = '✓ Active'; document.getElementById('key-btn').style.color = '#2ec4a9';
-  document.getElementById('key-modal').classList.remove('open');
-  setTimeout(()=>{ callFrida(`Jeff just opened Frida. Greet him warmly in 2 sentences. It's ${new Date().getHours()<12?'morning':new Date().getHours()<17?'afternoon':'evening'}.`,true).then(r=>{ if(r){ fridaSay(parseCommits(r)); speak(r); }}); },500);
+function selectProvider(p) {
+  S.provider = p;
+  document.querySelectorAll('.prov-card').forEach(c => c.classList.toggle('active', c.dataset.p === p));
+  const prov = PROVIDERS[p];
+  document.getElementById('prov-hint').textContent = prov.hint;
+  document.getElementById('ki').placeholder = prov.placeholder;
+  document.getElementById('prov-link-note').innerHTML = `Get your key at <strong>${prov.link}</strong>`;
+  // Pre-fill if we already have a key for this provider
+  const stored = localStorage.getItem(`frida_key_${p}`) || '';
+  document.getElementById('ki').value = stored ? '••••••••••••••••' : '';
+  document.getElementById('ki').dataset.prefilled = stored ? '1' : '';
 }
-document.getElementById('key-modal').addEventListener('click',e=>{ if(e.target===document.getElementById('key-modal')) document.getElementById('key-modal').classList.remove('open'); });
+
+function openKeyModal() {
+  document.getElementById('key-modal').classList.add('open');
+  // Restore current provider selection
+  selectProvider(S.provider);
+  setTimeout(() => document.getElementById('ki').focus(), 400);
+}
+
+function saveKey() {
+  const inp = document.getElementById('ki');
+  // If field shows bullets and user didn't change it, keep existing key
+  let k = inp.dataset.prefilled === '1' && inp.value === '••••••••••••••••'
+    ? localStorage.getItem(`frida_key_${S.provider}`) || ''
+    : inp.value.trim();
+
+  const prov = PROVIDERS[S.provider];
+  if (!k || !prov.validate(k)) {
+    inp.style.borderColor = 'rgba(248,100,100,.6)';
+    document.getElementById('prov-hint').textContent = `⚠️ That doesn't look right for a ${prov.name} key. ${prov.hint}`;
+    return;
+  }
+
+  S.apiKey = k;
+  localStorage.setItem('frida_key', k);
+  localStorage.setItem(`frida_key_${S.provider}`, k);
+  localStorage.setItem('frida_provider', S.provider);
+
+  const provLabel = `${prov.name} ✓`;
+  document.getElementById('key-btn').textContent = provLabel;
+  document.getElementById('key-btn').style.color = '#2ec4a9';
+  document.getElementById('key-modal').classList.remove('open');
+
+  setTimeout(() => {
+    callFrida(`Jeff just opened Frida. Greet him warmly in 2 sentences. It's ${new Date().getHours()<12?'morning':new Date().getHours()<17?'afternoon':'evening'}.`, true)
+      .then(r => { if(r) { fridaSay(parseCommits(r)); speak(r); }});
+  }, 500);
+}
+
+document.getElementById('key-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('key-modal')) document.getElementById('key-modal').classList.remove('open');
+});
 
 // ═══════════════════════════════════════════
 // FDP — FRIDA DEVICE PROTOCOL v1.1
@@ -1408,7 +1451,8 @@ function init() {
   document.getElementById('thresh-display').textContent = S.thresholds.hr;
 
   if (S.apiKey) {
-    document.getElementById('key-btn').textContent = '✓ Active';
+    const prov = PROVIDERS[S.provider];
+    document.getElementById('key-btn').textContent = `${prov.name} ✓`;
     document.getElementById('key-btn').style.color = '#2ec4a9';
   } else {
     setTimeout(openKeyModal, 1200);
