@@ -6,1468 +6,2230 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#060912">
-<title>Frida</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#000008">
+<!-- CSP NOTE: unsafe-inline and unsafe-eval are present for prototype/beta only.
+     These will be removed when code is split into separate files in v4.
+     Do not represent this as a hardened CSP. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com https://api.anthropic.com https://api.groq.com https://generativelanguage.googleapis.com https://api.openai.com https://api.elevenlabs.io;">
+<title>Frida · NeuroForge v3.1</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Jost:wght@200;300;400;500&display=swap" rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════
-   ROOT
-═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   FRIDA_NEURO v3.1 — STABILIZATION BUILD
+   Frida Presence Shell · NeuroForge Engine
+   "One thing. Not a list."
+
+   v3.1 CHANGELOG:
+   [FIX-1] Duplicate privacy-badge ID resolved
+           → privacy-badge-top (topbar)
+           → privacy-badge-main (centered float)
+   [FIX-2] Fake "Launch Instantly" renamed to "Set Up Frida"
+           Subtext updated — no false shared-backend claims
+   [FIX-3] API key: honest storage disclosure added
+           Clear saved key button added to settings
+   [FIX-4] Font sizes: body 16px, panel 18px, items 15px
+           Contrast improved across labels and body text
+   [FIX-5] Tablet breakpoint added @700px
+           Orb, panel, input, text all scale up intentionally
+   [FIX-6] CSP marked as prototype-only — no false hardening claims
+   [FIX-7] Privacy Mode hardening: mic/TTS/AI blocked,
+           buttons disabled, orb status updated, both badges sync
+   [FIX-8] Kill switch: terminates mic, TTS, panel, overlays,
+           think-dots, bio debounce, returns orb to idle
+   [iOS]   Cross-platform: audio unlock, voice restart, install hint
+   [DROID] Backdrop-filter fallback for Samsung Internet
+
+   v3.1 TESTING CHECKLIST:
+   [ ] 1. First launch — onboarding shows
+   [ ] 2. Set up key — saves, greet fires
+   [ ] 3. Text prompt — orb thinking→speaking→idle
+   [ ] 4. Mic input — orb enters listening state
+   [ ] 5. TTS response — voice plays
+   [ ] 6. Summary panel — orb transforms, types content
+   [ ] 7. Recall panel — commitments listed
+   [ ] 8. Still Water — mic stops, breathing shows, exit after 30s
+   [ ] 9. Recovery — one action, done button returns to normal
+   [ ] 10. Privacy mode — mic/AI disabled, badge visible, buttons disabled
+   [ ] 11. Kill switch — everything stops immediately
+   [ ] 12. Settings save — persists on reload
+   [ ] 13. Reload — state restores correctly
+   [ ] 14. Clear key — removes saved key
+═══════════════════════════════════════════════════ */
 :root {
-  --safe-top: env(safe-area-inset-top, 44px);
+  --safe-top:    env(safe-area-inset-top, 44px);
   --safe-bottom: env(safe-area-inset-bottom, 20px);
-  --bg-deep: #060912;
-  --glass-fill: rgba(255,255,255,0.07);
-  --glass-fill-md: rgba(255,255,255,0.12);
-  --glass-fill-hi: rgba(255,255,255,0.20);
-  --glass-border: rgba(255,255,255,0.14);
-  --glass-border-hi: rgba(255,255,255,0.30);
-  --glass-blur: blur(32px) saturate(1.9) brightness(1.05);
-  --text-1: rgba(255,255,255,0.95);
-  --text-2: rgba(255,255,255,0.55);
-  --text-3: rgba(255,255,255,0.30);
-  --font-ui: 'Figtree', sans-serif;
-  --font-display: 'Playfair Display', serif;
-  --r-card: 22px;
-  --r-pill: 50px;
-  --mode-ambient:  #3b7ef8;
-  --mode-regulate: #2ec4a9;
-  --mode-calm:     #9b74f0;
-  --mode-launch:   #f87c3b;
-  --mode-bio:      #f84b7a;
+  --void: #000008;
+  --fd: 'Cormorant Garamond', serif;
+  --fu: 'Jost', sans-serif;
+  --t1: rgba(255,255,255,0.93);
+  --t2: rgba(255,255,255,0.55);
+  --t3: rgba(255,255,255,0.25);
+  --t4: rgba(255,255,255,0.10);
+  /* Mode accent colors */
+  --c-normal:   #8cb4ff;
+  --c-overload: #f86464;
+  --c-recovery: #8cdcb4;
+  /* Panel glass */
+  --panel-bg:   rgba(4,6,18,0.88);
+  --panel-border: rgba(140,180,255,0.18);
+  --panel-glow: rgba(100,150,255,0.08);
 }
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font-ui);background:var(--bg-deep);color:var(--text-1);touch-action:manipulation;user-select:none;-webkit-user-select:none}
 
-/* ═══════════════════════════════════════════
-   ATMOSPHERE
-═══════════════════════════════════════════ */
-#atmo{position:fixed;inset:0;z-index:0;transition:all 2.5s ease}
-.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.28;transition:all 3s cubic-bezier(.4,0,.2,1)}
-#o1{width:380px;height:380px;top:-100px;left:-80px;background:radial-gradient(circle,#1a3a8a,transparent)}
-#o2{width:300px;height:300px;top:25%;right:-90px;background:radial-gradient(circle,#2a1060,transparent)}
-#o3{width:400px;height:400px;bottom:-120px;left:5%;background:radial-gradient(circle,#0d3a56,transparent)}
-#o4{width:220px;height:220px;top:50%;left:35%;background:radial-gradient(circle,#1a4a3a,transparent);opacity:.18}
-#atmo::after{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");opacity:.7;pointer-events:none}
+*,*::before,*::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { width:100%; height:100%; overflow:hidden; background:var(--void); font-family:var(--fu); color:var(--t1); touch-action:manipulation; user-select:none; -webkit-user-select:none; }
 
-/* ═══════════════════════════════════════════
-   STATUS BAR
-═══════════════════════════════════════════ */
-#sb{position:fixed;top:0;left:0;right:0;height:calc(var(--safe-top) + 8px);display:flex;align-items:flex-end;justify-content:space-between;padding:0 22px 8px;z-index:200}
-.sb-time{font-size:15px;font-weight:600;letter-spacing:-.3px}
-.sb-icons{display:flex;gap:5px;align-items:center;font-size:11px;font-weight:600}
-#sb-hr-badge{background:rgba(248,75,122,.25);border:1px solid rgba(248,75,122,.45);border-radius:8px;padding:2px 7px;font-size:11px;font-weight:700;color:#f84b7a;display:none;animation:fadeIn .4s ease}
+/* ─── VOID ─── */
+#void {
+  position:fixed; inset:0; z-index:0;
+  background: radial-gradient(ellipse 75% 55% at 50% 50%, rgba(8,6,32,0.95) 0%, #000008 65%);
+}
+#void::before {
+  content:''; position:absolute; inset:0;
+  background-image:
+    radial-gradient(1px 1px at 8%  14%, rgba(255,255,255,0.22) 0%, transparent 100%),
+    radial-gradient(1px 1px at 38% 7%,  rgba(255,255,255,0.18) 0%, transparent 100%),
+    radial-gradient(1px 1px at 72% 19%, rgba(255,255,255,0.15) 0%, transparent 100%),
+    radial-gradient(1px 1px at 91% 44%, rgba(255,255,255,0.18) 0%, transparent 100%),
+    radial-gradient(1px 1px at 22% 63%, rgba(255,255,255,0.12) 0%, transparent 100%),
+    radial-gradient(1px 1px at 58% 78%, rgba(255,255,255,0.14) 0%, transparent 100%),
+    radial-gradient(1px 1px at 84% 71%, rgba(255,255,255,0.10) 0%, transparent 100%),
+    radial-gradient(1px 1px at 45% 90%, rgba(255,255,255,0.12) 0%, transparent 100%);
+  animation: stars 25s ease-in-out infinite alternate;
+}
+@keyframes stars { 0%{opacity:.45} 100%{opacity:.95} }
 
-/* ═══════════════════════════════════════════
-   APP SHELL
-═══════════════════════════════════════════ */
-#app{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;padding-top:calc(var(--safe-top) + 14px);padding-bottom:calc(var(--safe-bottom) + 76px)}
+/* ─── PERSISTENT UI CHROME ─── */
+#top-bar {
+  position:fixed; top:0; left:0; right:0;
+  height:calc(var(--safe-top) + 4px);
+  display:flex; align-items:flex-end; justify-content:space-between;
+  padding:0 18px 6px; z-index:200; pointer-events:none;
+}
+.tb-left  { display:flex; align-items:center; gap:8px; }
+.tb-right { display:flex; align-items:center; gap:8px; }
 
-/* ═══════════════════════════════════════════
-   HEADER
-═══════════════════════════════════════════ */
-#hdr{padding:10px 20px 12px;display:flex;align-items:center;gap:12px;flex-shrink:0}
-#avatar{width:50px;height:50px;border-radius:50%;background:var(--glass-fill-md);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1.5px solid var(--glass-border-hi);display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;transition:box-shadow .4s,border-color .4s}
-#avatar.pulse{animation:pulse-ring 2s ease-in-out infinite;border-color:var(--mode-ambient)}
-@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(59,126,248,.5)}70%{box-shadow:0 0 0 14px rgba(59,126,248,0)}100%{box-shadow:0 0 0 0 rgba(59,126,248,0)}}
-#hdr-text{flex:1}
-#hdr-text h1{font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-.5px;line-height:1}
-#hdr-text .sub{font-size:11px;color:var(--text-2);margin-top:3px;letter-spacing:.2px}
-#key-btn{background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:10px;padding:7px 11px;color:var(--text-2);font-family:var(--font-ui);font-size:11px;font-weight:500;cursor:pointer;transition:all .2s}
-#key-btn:active{opacity:.7}
+#sb-time { font-size:14px; font-weight:400; letter-spacing:-.2px; color:var(--t2); pointer-events:none; }
 
-/* ═══════════════════════════════════════════
-   MODE BAR
-═══════════════════════════════════════════ */
-#mode-bar{display:flex;gap:7px;padding:0 20px 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-shrink:0}
-#mode-bar::-webkit-scrollbar{display:none}
-.mpill{display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:var(--r-pill);background:var(--glass-fill);border:1px solid var(--glass-border);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;white-space:nowrap;transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;letter-spacing:.2px}
-.mpill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5;transition:opacity .2s,transform .2s}
-.mpill.active{color:var(--text-1)}
-.mpill.active .dot{opacity:1;transform:scale(1.4)}
-.mpill[data-m="ambient"].active {background:rgba(59,126,248,.18);border-color:rgba(59,126,248,.5)}
-.mpill[data-m="regulate"].active{background:rgba(46,196,169,.18);border-color:rgba(46,196,169,.5)}
-.mpill[data-m="calm"].active    {background:rgba(155,116,240,.18);border-color:rgba(155,116,240,.5)}
-.mpill[data-m="launch"].active  {background:rgba(248,124,59,.18);border-color:rgba(248,124,59,.5)}
-.mpill[data-m="bio"].active     {background:rgba(248,75,122,.18);border-color:rgba(248,75,122,.5)}
+#mode-badge {
+  font-size:9px; font-weight:400; letter-spacing:2px;
+  text-transform:uppercase; padding:3px 9px;
+  border-radius:10px; border:1px solid transparent;
+  transition:all 1.2s ease; pointer-events:none;
+}
 
-/* ═══════════════════════════════════════════
-   SCROLL CONTENT
-═══════════════════════════════════════════ */
-#scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 20px}
-#scroll::-webkit-scrollbar{display:none}
+#privacy-badge-top {
+  font-size:9px; font-weight:300; letter-spacing:2px;
+  text-transform:uppercase; padding:3px 10px;
+  border-radius:10px;
+  background:rgba(248,180,0,0.1);
+  border:1px solid rgba(248,180,0,0.3);
+  color:rgba(248,210,80,0.8);
+  display:none;
+}
+#privacy-badge-top.on { display:block; }
 
-/* ═══════════════════════════════════════════
-   GLASS CARD
-═══════════════════════════════════════════ */
-.gc{background:var(--glass-fill);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--r-card);position:relative;overflow:hidden;box-shadow:0 10px 36px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.1);margin-bottom:14px;transition:all .3s ease}
-.gc::before{content:'';position:absolute;top:0;left:0;right:0;height:44%;background:linear-gradient(to bottom,rgba(255,255,255,.09) 0%,transparent 100%);border-radius:var(--r-card) var(--r-card) 0 0;pointer-events:none}
-.gc-p{padding:18px 18px}
-.sec-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-3);margin-bottom:10px}
+/* Privacy badge centered — visible when active */
+#privacy-badge-main {
+  position:fixed;
+  top:calc(var(--safe-top) + 6px);
+  left:50%; transform:translateX(-50%);
+  font-size:9px; font-weight:300; letter-spacing:2px;
+  text-transform:uppercase; padding:3px 12px;
+  border-radius:10px; z-index:250;
+  background:rgba(248,180,0,0.1);
+  border:1px solid rgba(248,180,0,0.3);
+  color:rgba(248,210,80,0.8);
+  display:none; pointer-events:none;
+  white-space:nowrap;
+}
+#privacy-badge-main.on { display:block; }
 
-/* ═══════════════════════════════════════════
-   MODE PANELS
-═══════════════════════════════════════════ */
-.panel{display:none;animation:panelIn .38s cubic-bezier(.34,1.2,.64,1) both}
-.panel.active{display:block}
-@keyframes panelIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+#kill-btn {
+  width:34px; height:34px; border-radius:50%;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);
+  color:var(--t3); font-size:13px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:all .2s; pointer-events:all; -webkit-appearance:none;
+}
+#kill-btn:active { background:rgba(248,80,80,0.15); border-color:rgba(248,80,80,0.3); color:rgba(255,120,120,0.9); transform:scale(.9); }
 
-/* ─── FRIDA RESPONSE ─── */
-#frida-resp{background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:18px;padding:14px 16px;font-size:14px;line-height:1.6;color:var(--text-1);display:none;animation:fadeUp .4s ease both;margin-bottom:12px}
-#frida-resp.show{display:block}
-.fr-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-3);text-transform:uppercase;margin-bottom:7px}
-.dots{display:inline-flex;gap:4px;align-items:center}
-.dots span{width:6px;height:6px;border-radius:50%;background:var(--text-3);animation:db 1.2s ease-in-out infinite}
-.dots span:nth-child(2){animation-delay:.2s}
-.dots span:nth-child(3){animation-delay:.4s}
-@keyframes db{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+/* ─── FRIDA STAGE ─── */
+#stage {
+  position:fixed; inset:0; z-index:10;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  pointer-events:none;
+}
 
-/* ─── AMBIENT ─── */
-.listen-core{padding:28px 20px 22px;text-align:center}
-#mic-orb{width:130px;height:130px;border-radius:50%;background:var(--glass-fill-md);border:1.5px solid var(--glass-border-hi);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:46px;position:relative;cursor:pointer;transition:all .3s ease}
-#mic-orb::before{content:'';position:absolute;inset:-10px;border-radius:50%;border:1px solid rgba(59,126,248,.2);animation:ring 3s ease-in-out infinite}
-#mic-orb::after{content:'';position:absolute;inset:-22px;border-radius:50%;border:1px solid rgba(59,126,248,.1);animation:ring 3s ease-in-out infinite .5s}
-@keyframes ring{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
-#mic-orb.on{background:rgba(59,126,248,.22);border-color:rgba(59,126,248,.6);box-shadow:0 0 60px rgba(59,126,248,.28);animation:mpulse 1.2s ease-in-out infinite}
-@keyframes mpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
-.ls-status{font-size:14px;font-weight:500;color:var(--text-2);margin-bottom:5px}
-.ls-hint{font-size:12px;color:var(--text-3)}
-#tfeed{padding:0 16px 16px;display:flex;flex-direction:column;gap:9px}
-.tbub{background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:14px;padding:11px 14px;font-size:13px;line-height:1.5;animation:fadeUp .4s ease both}
-.tbub.commit{border-color:rgba(46,196,169,.4);background:rgba(46,196,169,.09)}
-.tbub .tm{font-size:10px;color:var(--text-3);margin-bottom:4px;display:flex;justify-content:space-between;text-transform:uppercase;letter-spacing:.8px}
-.tbub.commit .tm{color:#2ec4a9}
+/* Speech materializes above orb */
+#speech-wrap {
+  position:absolute;
+  top:calc(50% - 190px);
+  left:50%; transform:translateX(-50%) translateY(18px);
+  width:min(340px,88vw); text-align:center;
+  opacity:0; transition:opacity 1.3s ease, transform 1.3s ease;
+  pointer-events:none;
+}
+#speech-wrap.on { opacity:1; transform:translateX(-50%) translateY(0); }
+#speech-lbl { font-size:9px; font-weight:300; letter-spacing:3px; color:var(--t3); text-transform:uppercase; margin-bottom:9px; }
+#speech-txt { font-family:var(--fd); font-size:21px; font-weight:300; font-style:italic; line-height:1.55; color:rgba(218,228,255,0.92); text-shadow:0 0 50px rgba(130,170,255,0.3); }
 
-/* ─── REGULATE ─── */
-.reg-greeting{font-family:var(--font-display);font-size:19px;font-weight:700;margin-bottom:3px}
-.reg-snap{font-size:12px;color:var(--text-2)}
-.next-card{padding:14px 16px;margin-bottom:12px;border-left:3px solid var(--mode-regulate);border-radius:0 14px 14px 0;background:rgba(46,196,169,.08);border-top:1px solid rgba(46,196,169,.18);border-right:1px solid rgba(46,196,169,.1);border-bottom:1px solid rgba(46,196,169,.1)}
-.nc-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;color:#2ec4a9;margin-bottom:5px;text-transform:uppercase}
-.nc-title{font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:2px}
-.nc-time{font-size:11px;color:var(--text-2)}
-.task{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:opacity .2s}
-.task:last-child{border-bottom:none}
-.task:active{opacity:.6}
-.tck{width:21px;height:21px;border-radius:50%;border:1.5px solid var(--glass-border-hi);background:var(--glass-fill);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .2s}
-.task.done .tck{background:rgba(46,196,169,.3);border-color:#2ec4a9}
-.task.done .tck::after{content:'✓';color:#2ec4a9;font-weight:700}
-.task.done .ttxt{text-decoration:line-through;opacity:.4}
-.ttxt{font-size:13px;font-weight:500;flex:1;line-height:1.3}
-.ttime{font-size:10px;color:var(--text-3);flex-shrink:0}
+/* ─── THE ORB ─── */
+#orb-wrap {
+  position:relative; width:240px; height:240px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; pointer-events:all;
+  transition:transform .5s cubic-bezier(0.34,1.2,.64,1);
+}
+#orb-wrap:active { transform:scale(.93); }
 
-/* ─── CALM ─── */
-.calm-top{padding:28px 20px 20px;text-align:center}
-.calm-orb{width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,rgba(155,116,240,.35) 0%,transparent 70%);border:1px solid rgba(155,116,240,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:42px;animation:cbreathe 5s ease-in-out infinite;box-shadow:0 0 40px rgba(155,116,240,.18)}
-@keyframes cbreathe{0%,100%{transform:scale(1);box-shadow:0 0 40px rgba(155,116,240,.18)}50%{transform:scale(1.08);box-shadow:0 0 60px rgba(155,116,240,.32)}}
-.calm-msg{font-family:var(--font-display);font-size:20px;font-weight:400;font-style:italic;color:var(--text-1);line-height:1.4;margin-bottom:7px}
-.calm-sub{font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:20px}
-.breathe-row{display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:24px}
-.bbar{width:36px;height:4px;border-radius:2px;background:rgba(155,116,240,.25);overflow:hidden;position:relative}
-.bbar::after{content:'';position:absolute;inset:0;border-radius:2px;background:#9b74f0;transform:scaleX(0);transform-origin:left;animation:bfill 5s ease-in-out infinite}
-.bbar:nth-child(2)::after{animation-delay:.15s}
-.bbar:nth-child(3)::after{animation-delay:.3s}
-.bbar:nth-child(4)::after{animation-delay:.45s}
-@keyframes bfill{0%,100%{transform:scaleX(0)}40%,60%{transform:scaleX(1)}}
-.blbl{font-size:10px;color:var(--text-3);letter-spacing:1px;text-transform:uppercase}
-.calm-chat{padding:0 16px 16px;display:flex;flex-direction:column;gap:9px}
-.cbub{padding:13px 15px;border-radius:16px;font-size:13px;line-height:1.55;animation:fadeUp .4s ease both}
-.cbub.f{background:rgba(155,116,240,.14);border:1px solid rgba(155,116,240,.22);border-radius:16px 16px 16px 4px}
-.cbub.u{background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:16px 16px 4px 16px;text-align:right}
+#orb-canvas { position:absolute; inset:-50px; width:calc(100% + 100px); height:calc(100% + 100px); }
 
-/* ─── LAUNCH ─── */
-.launch-top{padding:24px 20px 18px;text-align:center}
-.l-icon{font-size:52px;margin-bottom:14px;animation:lbounce 2s ease-in-out infinite}
-@keyframes lbounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
-.l-q{font-family:var(--font-display);font-size:21px;font-weight:700;color:var(--text-1);line-height:1.3;margin-bottom:7px}
-.l-sub{font-size:13px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
-.one-card{background:rgba(248,124,59,.11);border:1px solid rgba(248,124,59,.28);border-radius:18px;padding:18px;margin-bottom:18px;text-align:left;position:relative;overflow:hidden}
-.one-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(248,124,59,.6),transparent)}
-.one-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;color:#f87c3b;text-transform:uppercase;margin-bottom:7px}
-.one-txt{font-size:17px;font-weight:600;color:var(--text-1);line-height:1.4}
-.lstep{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
-.lstep:last-child{border-bottom:none}
-.snum{width:22px;height:22px;border-radius:50%;background:rgba(248,124,59,.2);border:1px solid rgba(248,124,59,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#f87c3b;flex-shrink:0}
-.stxt{font-size:13px;color:var(--text-1);line-height:1.4;flex:1;padding-top:2px}
+.o-ring {
+  position:absolute; border-radius:50%;
+  border:1px solid rgba(130,170,255,0.08);
+  transition:all 1.8s ease;
+  animation:ring-breathe 7s ease-in-out infinite;
+}
+.o-ring:nth-child(2){ inset:-16px; animation-delay:0s; }
+.o-ring:nth-child(3){ inset:-30px; animation-delay:.9s; opacity:.6; }
+.o-ring:nth-child(4){ inset:-46px; animation-delay:1.8s; opacity:.3; }
+@keyframes ring-breathe { 0%,100%{transform:scale(1);opacity:.45} 50%{transform:scale(1.03);opacity:1} }
 
-/* ═══════════════════════════════════════════
-   BIOMETRICS PANEL (5th mode)
-═══════════════════════════════════════════ */
-/* Top vitals row */
-.bio-vitals{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.vital-card{background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:18px;padding:16px;position:relative;overflow:hidden;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:0 8px 24px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.1)}
-.vital-card::before{content:'';position:absolute;top:0;left:0;right:0;height:45%;background:linear-gradient(to bottom,rgba(255,255,255,.08),transparent);border-radius:18px 18px 0 0;pointer-events:none}
-.vital-card.alert{border-color:rgba(248,75,122,.45);background:rgba(248,75,122,.1)}
-.vital-card.good {border-color:rgba(46,196,169,.35);background:rgba(46,196,169,.07)}
-.vital-card.warn {border-color:rgba(248,180,0,.35);background:rgba(248,180,0,.07)}
-.vc-icon{font-size:20px;margin-bottom:7px}
-.vc-lbl{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-3);margin-bottom:3px}
-.vc-val{font-size:28px;font-weight:700;color:var(--text-1);letter-spacing:-1px;line-height:1}
-.vc-unit{font-size:11px;color:var(--text-2);margin-top:2px}
-.vc-trend{font-size:10px;margin-top:5px;font-weight:600}
-.vc-trend.up{color:#f84b7a}
-.vc-trend.down{color:#2ec4a9}
-.vc-trend.stable{color:var(--text-3)}
+#orb-core {
+  position:absolute; inset:0; border-radius:50%;
+  background:radial-gradient(circle at 38% 33%, rgba(190,215,255,0.1) 0%, rgba(110,145,215,0.05) 38%, transparent 72%);
+  box-shadow:0 0 50px rgba(110,155,255,0.1), 0 0 100px rgba(90,125,215,0.05), inset 0 0 40px rgba(170,205,255,0.04);
+  transition:all 1.8s cubic-bezier(.4,0,.2,1);
+}
+#orb-core::before {
+  content:''; position:absolute; top:14%; left:18%; width:33%; height:20%;
+  background:radial-gradient(ellipse, rgba(255,255,255,0.13) 0%, transparent 70%);
+  border-radius:50%; filter:blur(3px);
+}
 
-/* Stress ring */
-.stress-ring-wrap{display:flex;flex-direction:column;align-items:center;padding:20px;gap:14px}
-.ring-container{position:relative;width:150px;height:150px}
-.ring-container svg{transform:rotate(-90deg)}
-.ring-bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:10}
-.ring-fill{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1),stroke .6s ease}
-.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.ring-val{font-size:36px;font-weight:700;color:var(--text-1);letter-spacing:-1.5px;line-height:1}
-.ring-sub{font-size:11px;color:var(--text-2);margin-top:2px}
-.stress-lbl{font-size:18px;font-weight:700;color:var(--text-1)}
-.stress-desc{font-size:13px;color:var(--text-2);text-align:center;line-height:1.5;max-width:240px}
+#orb-name { position:absolute; bottom:-46px; left:50%; transform:translateX(-50%); font-family:var(--fd); font-size:15px; font-weight:300; letter-spacing:8px; text-transform:uppercase; color:rgba(150,185,255,0.28); white-space:nowrap; transition:all 1.5s ease; }
+#orb-status { position:absolute; bottom:-68px; left:50%; transform:translateX(-50%); font-size:9px; font-weight:200; letter-spacing:3px; text-transform:uppercase; color:var(--t3); white-space:nowrap; transition:all .7s ease; }
 
-/* HR chart */
-.hr-chart-wrap{padding:16px 18px}
-.hr-chart{width:100%;height:80px;position:relative;overflow:hidden}
-.hr-chart canvas{width:100%!important;height:80px!important}
+#think-dots { position:absolute; bottom:-88px; left:50%; transform:translateX(-50%); display:none; gap:5px; align-items:center; }
+#think-dots.on { display:flex; }
+.td { width:5px; height:5px; border-radius:50%; background:rgba(150,180,255,0.35); animation:tdb 1.2s ease-in-out infinite; }
+.td:nth-child(2){ animation-delay:.2s } .td:nth-child(3){ animation-delay:.4s }
+@keyframes tdb { 0%,100%{opacity:.2;transform:translateY(0)} 50%{opacity:1;transform:translateY(-4px)} }
 
-/* Connection panel */
-.conn-panel{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
-.conn-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;background:var(--glass-fill);border:1px solid var(--glass-border);cursor:pointer;transition:all .2s}
-.conn-row:active{opacity:.7}
-.conn-icon{font-size:22px;flex-shrink:0}
-.conn-info{flex:1}
-.conn-name{font-size:14px;font-weight:600;color:var(--text-1)}
-.conn-desc{font-size:11px;color:var(--text-2);margin-top:2px}
-.conn-status{font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;flex-shrink:0}
-.conn-status.connected{background:rgba(46,196,169,.2);color:#2ec4a9;border:1px solid rgba(46,196,169,.3)}
-.conn-status.ready{background:rgba(59,126,248,.15);color:#3b7ef8;border:1px solid rgba(59,126,248,.25)}
-.conn-status.off{background:var(--glass-fill);color:var(--text-3);border:1px solid var(--glass-border)}
+/* ═══════════════════════════════════════════════════
+   ORB TRANSFORMATION SYSTEM
+   The orb IS the interface. Emotion → Cognition.
+═══════════════════════════════════════════════════ */
+#orb-panel {
+  position:fixed;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%) scale(0.15);
+  width:min(380px,92vw);
+  background:var(--panel-bg);
+  border:1px solid var(--panel-border);
+  border-radius:24px;
+  box-shadow:
+    0 0 0 1px rgba(140,180,255,0.06),
+    0 20px 60px rgba(0,0,10,0.7),
+    0 0 80px var(--panel-glow),
+    inset 0 1px 0 rgba(180,210,255,0.08),
+    inset 0 0 40px rgba(80,120,200,0.04);
+  z-index:50;
+  opacity:0;
+  pointer-events:none;
+  transition:
+    transform .7s cubic-bezier(0.34,1.15,.64,1),
+    opacity .5s ease,
+    border-color .5s ease;
+  overflow:hidden;
+  backdrop-filter:blur(28px) saturate(1.6);
+  -webkit-backdrop-filter:blur(28px) saturate(1.6);
+}
 
-/* FDP log */
-.fdp-log{padding:12px 18px 16px;display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto}
-.fdp-log::-webkit-scrollbar{display:none}
-.fdp-entry{font-size:11px;color:var(--text-2);font-family:monospace;background:rgba(255,255,255,.04);border-radius:6px;padding:5px 9px;letter-spacing:.3px;border-left:2px solid transparent}
-.fdp-entry.hr{border-left-color:#f84b7a;color:rgba(248,75,122,.9)}
-.fdp-entry.hrv{border-left-color:#3b7ef8;color:rgba(59,126,248,.9)}
-.fdp-entry.stress{border-left-color:#f87c3b;color:rgba(248,124,59,.9)}
-.fdp-entry.ble{border-left-color:#2ec4a9;color:rgba(46,196,169,.9)}
-.fdp-entry.sys{border-left-color:rgba(255,255,255,.2);color:var(--text-3)}
+/* Scanline texture overlay */
+#orb-panel::before {
+  content:''; position:absolute; inset:0; z-index:0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(140,180,255,0.012) 2px,
+    rgba(140,180,255,0.012) 4px
+  );
+  pointer-events:none; border-radius:24px;
+}
 
-/* Threshold editor */
-.thresh-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
-.thresh-row:last-child{border-bottom:none}
-.thresh-lbl{font-size:13px;color:var(--text-1);flex:1}
-.thresh-val{font-size:13px;font-weight:700;color:var(--text-1);width:46px;text-align:center}
-.thresh-btn{width:30px;height:30px;border-radius:50%;background:var(--glass-fill-md);border:1px solid var(--glass-border);color:var(--text-1);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-ui);transition:all .15s;-webkit-appearance:none}
-.thresh-btn:active{transform:scale(.88)}
+/* Top glow edge */
+#orb-panel::after {
+  content:''; position:absolute; top:0; left:10%; right:10%; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(140,180,255,0.5), transparent);
+  pointer-events:none;
+}
 
-/* Stress alert banner */
-#stress-alert{position:fixed;top:calc(var(--safe-top) + 60px);left:16px;right:16px;z-index:300;background:rgba(248,75,122,.18);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(248,75,122,.5);border-radius:18px;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(248,75,122,.2);transform:translateY(-120%);transition:transform .5s cubic-bezier(.34,1.2,.64,1);pointer-events:none}
-#stress-alert.show{transform:translateY(0);pointer-events:all}
-.sa-icon{font-size:24px;flex-shrink:0}
-.sa-text{flex:1}
-.sa-title{font-size:14px;font-weight:700;color:#f84b7a}
-.sa-sub{font-size:12px;color:var(--text-2);margin-top:2px}
-.sa-btn{background:rgba(248,75,122,.25);border:1px solid rgba(248,75,122,.4);border-radius:10px;color:#f84b7a;font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer;font-family:var(--font-ui);white-space:nowrap;-webkit-appearance:none}
+#orb-panel.open {
+  transform:translate(-50%,-50%) scale(1);
+  opacity:1;
+  pointer-events:all;
+}
 
-/* ═══════════════════════════════════════════
-   INPUT BAR
-═══════════════════════════════════════════ */
-#ibar{position:fixed;bottom:0;left:0;right:0;padding:10px 14px calc(var(--safe-bottom) + 10px);background:rgba(6,9,18,.82);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);border-top:1px solid var(--glass-border);z-index:100;display:flex;align-items:center;gap:9px}
-#txt-in{flex:1;background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:20px;padding:10px 15px;font-family:var(--font-ui);font-size:14px;color:var(--text-1);outline:none;-webkit-appearance:none;caret-color:var(--mode-ambient);transition:border-color .2s}
-#txt-in::placeholder{color:var(--text-3)}
-#txt-in:focus{border-color:var(--glass-border-hi)}
-.ibtn{width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;transition:all .2s;-webkit-appearance:none}
-.ibtn:active{transform:scale(.88)}
-#mic-btn{background:var(--glass-fill-md);border:1px solid var(--glass-border);color:var(--text-2)}
-#mic-btn.rec{background:rgba(59,126,248,.25);border-color:rgba(59,126,248,.6);color:white;animation:mpulse 1.2s ease-in-out infinite}
-#send-btn{background:linear-gradient(135deg,rgba(59,126,248,.8),rgba(59,126,248,.45));border:1px solid rgba(59,126,248,.5);color:white;box-shadow:0 4px 14px rgba(59,126,248,.22)}
+.panel-header {
+  padding:18px 20px 12px;
+  border-bottom:1px solid rgba(140,180,255,0.08);
+  display:flex; align-items:center; justify-content:space-between;
+  position:relative; z-index:1;
+}
+.panel-title { font-family:var(--fd); font-size:17px; font-weight:300; font-style:italic; color:rgba(200,220,255,0.85); letter-spacing:.5px; }
+.panel-close {
+  width:28px; height:28px; border-radius:50%;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  color:var(--t3); font-size:12px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  -webkit-appearance:none; transition:all .2s;
+}
+.panel-close:active { opacity:.6; transform:scale(.88); }
 
-/* ═══════════════════════════════════════════
-   API KEY MODAL
-═══════════════════════════════════════════ */
-#key-modal{position:fixed;inset:0;z-index:400;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .3s}
-#key-modal.open{opacity:1;pointer-events:all}
-.ksheet{background:rgba(10,14,28,.96);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);border:1px solid var(--glass-border-hi);border-radius:26px 26px 0 0;padding:26px 22px calc(var(--safe-bottom) + 26px);width:100%;max-width:480px;transform:translateY(100%);transition:transform .4s cubic-bezier(.34,1.2,.64,1)}
-#key-modal.open .ksheet{transform:translateY(0)}
-.ksheet h2{font-family:var(--font-display);font-size:21px;font-weight:700;margin-bottom:5px;color:var(--text-1)}
-.ksheet p{font-size:13px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
-#ki{width:100%;padding:13px 15px;background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:14px;font-family:var(--font-ui);font-size:13px;color:var(--text-1);outline:none;margin-bottom:11px;-webkit-appearance:none;letter-spacing:.4px}
-#ki::placeholder{color:var(--text-3)}
-#ki:focus{border-color:var(--glass-border-hi)}
-.ksave{width:100%;padding:13px;background:linear-gradient(135deg,rgba(59,126,248,.7),rgba(59,126,248,.4));border:1px solid rgba(59,126,248,.5);border-radius:14px;font-family:var(--font-ui);font-size:15px;font-weight:600;color:white;cursor:pointer;-webkit-appearance:none;transition:all .2s}
-.ksave:active{transform:scale(.97);opacity:.85}
-.knote{font-size:11px;color:var(--text-3);text-align:center;margin-top:9px;line-height:1.5}
+.panel-body { padding:16px 20px 20px; position:relative; z-index:1; }
 
-/* ═══════════════════════════════════════════
-   SHORTCUTS GUIDE MODAL
-═══════════════════════════════════════════ */
-#sc-modal{position:fixed;inset:0;z-index:400;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .3s}
-#sc-modal.open{opacity:1;pointer-events:all}
-.sc-sheet{background:rgba(10,14,28,.96);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);border:1px solid var(--glass-border-hi);border-radius:26px 26px 0 0;padding:26px 22px calc(var(--safe-bottom) + 26px);width:100%;max-width:480px;transform:translateY(100%);transition:transform .4s cubic-bezier(.34,1.2,.64,1);max-height:80vh;overflow-y:auto}
-#sc-modal.open .sc-sheet{transform:translateY(0)}
-.sc-sheet h2{font-family:var(--font-display);font-size:20px;font-weight:700;margin-bottom:14px}
-.sc-step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
-.sc-num{width:24px;height:24px;border-radius:50%;background:rgba(59,126,248,.2);border:1px solid rgba(59,126,248,.4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#3b7ef8;flex-shrink:0;margin-top:1px}
-.sc-txt{font-size:13px;color:var(--text-1);line-height:1.5;flex:1}
-.sc-txt code{background:rgba(255,255,255,.1);border-radius:5px;padding:1px 6px;font-size:12px;font-family:monospace;color:#3b7ef8;word-break:break-all}
-.sc-close{width:100%;padding:12px;background:var(--glass-fill-md);border:1px solid var(--glass-border);border-radius:14px;font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--text-1);cursor:pointer;-webkit-appearance:none;margin-top:10px}
+/* Typed text output — Frida renders while thinking */
+.panel-typed {
+  font-family:var(--fd);
+  font-size:16px; font-weight:300; font-style:italic;
+  color:rgba(210,225,255,0.85);
+  line-height:1.65; letter-spacing:.2px;
+  min-height:48px;
+}
 
-/* UTIL */
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.spc{height:14px}
+/* Structured item list — max 5 */
+.panel-list { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
 
-/* ═══════════════════════════════════════════
-   PROVIDER CHOOSER
-═══════════════════════════════════════════ */
-#provider-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px}
-.prov-card{background:var(--glass-fill);border:1.5px solid var(--glass-border);border-radius:16px;padding:13px 12px;cursor:pointer;transition:all .25s cubic-bezier(.34,1.2,.64,1);text-align:center}
-.prov-card:active{transform:scale(.94)}
-.prov-card.active{background:rgba(59,126,248,.16);border-color:rgba(59,126,248,.55);box-shadow:0 0 16px rgba(59,126,248,.18)}
-.prov-card[data-p="gemini"].active {background:rgba(66,133,244,.16);border-color:rgba(66,133,244,.55)}
-.prov-card[data-p="groq"].active   {background:rgba(249,200,0,.12);border-color:rgba(249,200,0,.45)}
-.prov-card[data-p="openai"].active {background:rgba(16,163,127,.14);border-color:rgba(16,163,127,.45)}
-.prov-logo{font-size:22px;margin-bottom:5px}
-.prov-name{font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:2px}
-.prov-sub{font-size:10px;color:var(--text-2);margin-bottom:3px}
-.prov-cost{font-size:10px;font-weight:600;color:#2ec4a9}
-.prov-hint-box{font-size:12px;color:var(--text-2);background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:10px;padding:9px 12px;margin-bottom:10px;line-height:1.5;min-height:38px}
+.panel-item {
+  display:flex; align-items:flex-start; gap:10px;
+  padding:11px 14px;
+  background:rgba(140,180,255,0.04);
+  border:1px solid rgba(140,180,255,0.1);
+  border-radius:12px;
+  animation:item-in .4s ease both;
+  cursor:pointer; transition:all .2s;
+}
+.panel-item:active { background:rgba(140,180,255,0.1); transform:scale(.98); }
+
+@keyframes item-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+.pi-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:rgba(140,200,255,0.5);
+  flex-shrink:0; margin-top:5px;
+  transition:background .3s;
+}
+.panel-item.done .pi-dot { background:rgba(100,220,160,0.6); }
+.panel-item.done .pi-text { text-decoration:line-through; opacity:.4; }
+
+.pi-text { font-size:13px; font-weight:300; color:var(--t1); line-height:1.45; flex:1; }
+.pi-meta { font-size:10px; color:var(--t3); margin-top:2px; }
+
+.pi-priority-high   { border-color:rgba(248,140,100,0.2); }
+.pi-priority-medium { border-color:rgba(140,180,255,0.12); }
+
+.panel-action-row { display:flex; gap:8px; margin-top:14px; }
+.panel-btn {
+  flex:1; padding:10px 14px;
+  background:rgba(140,180,255,0.08);
+  border:1px solid rgba(140,180,255,0.18);
+  border-radius:12px; cursor:pointer;
+  font-family:var(--fu); font-size:11px;
+  font-weight:300; letter-spacing:1.5px;
+  text-transform:uppercase; color:rgba(170,205,255,0.75);
+  -webkit-appearance:none; transition:all .2s;
+}
+.panel-btn:active { transform:scale(.96); opacity:.7; }
+.panel-btn.primary {
+  background:rgba(140,180,255,0.15);
+  border-color:rgba(140,180,255,0.3);
+  color:rgba(200,220,255,0.9);
+}
+
+/* One-thing card */
+.one-thing-card {
+  background:rgba(100,180,140,0.07);
+  border:1px solid rgba(120,200,160,0.2);
+  border-radius:16px; padding:18px 16px;
+  position:relative; overflow:hidden; margin-bottom:14px;
+}
+.one-thing-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(120,200,160,0.5),transparent);
+}
+.ot-label { font-size:9px; font-weight:500; letter-spacing:2px; text-transform:uppercase; color:rgba(120,200,160,0.5); margin-bottom:8px; }
+.ot-text  { font-size:17px; font-weight:400; color:var(--t1); line-height:1.45; }
+
+/* ─── GHOST UI ─── */
+#ghost-ui {
+  position:fixed; inset:0; z-index:20;
+  pointer-events:none; opacity:0;
+  transition:opacity .85s ease;
+}
+#ghost-ui.on { opacity:1; pointer-events:all; }
+
+/* Quick action strip — top */
+#quick-strip {
+  position:absolute;
+  top:calc(var(--safe-top) + 16px);
+  left:0; right:0;
+  display:flex; justify-content:center; gap:6px;
+  padding:0 18px; overflow-x:auto; scrollbar-width:none;
+}
+#quick-strip::-webkit-scrollbar { display:none; }
+
+.qs-pill {
+  padding:7px 14px; border-radius:36px;
+  border:1px solid rgba(255,255,255,0.07);
+  background:rgba(255,255,255,0.03);
+  font-size:10px; font-weight:300;
+  letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--t3); cursor:pointer;
+  transition:all .35s ease; white-space:nowrap;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  flex-shrink:0; touch-action:manipulation;
+}
+.qs-pill.on { border-color:rgba(140,180,255,0.28); color:rgba(185,210,255,0.8); background:rgba(100,140,255,0.07); }
+.qs-pill:active { transform:scale(.92); }
+
+/* Commit stream */
+#commit-stream {
+  position:absolute;
+  bottom:calc(var(--safe-bottom) + 92px);
+  left:50%; transform:translateX(-50%);
+  width:min(340px,90vw);
+  display:flex; flex-direction:column; gap:7px;
+  align-items:center; pointer-events:none;
+  max-height:140px; overflow:hidden;
+}
+.commit-chip {
+  background:rgba(46,196,169,0.06);
+  border:1px solid rgba(46,196,169,0.14);
+  border-radius:11px; padding:8px 13px;
+  font-size:11px; font-weight:300;
+  color:rgba(130,215,195,0.75); text-align:center; width:100%;
+  animation:chip-in .55s cubic-bezier(0.34,1.2,.64,1) both;
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+}
+@keyframes chip-in { from{opacity:0;transform:translateY(12px) scale(.95)} to{opacity:1;transform:none} }
+
+/* Input area */
+#ghost-bottom {
+  position:absolute;
+  bottom:calc(var(--safe-bottom) + 12px);
+  left:0; right:0; padding:0 16px;
+  display:flex; flex-direction:column; gap:9px; align-items:center;
+}
+#input-row { display:flex; gap:9px; width:100%; max-width:400px; align-items:center; }
+
+#txt-in {
+  flex:1; background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:26px; padding:11px 17px;
+  font-family:var(--fu); font-size:14px; font-weight:300;
+  color:var(--t1); outline:none; -webkit-appearance:none;
+  caret-color:rgba(140,180,255,0.8); letter-spacing:.15px;
+  transition:border-color .3s, box-shadow .3s;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+}
+#txt-in::placeholder { color:rgba(255,255,255,0.16); }
+#txt-in:focus { border-color:rgba(140,180,255,0.25); box-shadow:0 0 22px rgba(100,140,255,0.07); }
+
+.g-btn {
+  width:44px; height:44px; border-radius:50%;
+  border:1px solid rgba(255,255,255,0.09);
+  background:rgba(255,255,255,0.04);
+  color:var(--t2); font-size:16px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:all .22s; -webkit-appearance:none; flex-shrink:0;
+}
+.g-btn:active { transform:scale(.87); }
+#btn-mic.rec { background:rgba(100,140,255,0.2); border-color:rgba(140,180,255,0.45); color:white; animation:mic-p 1.2s ease-in-out infinite; box-shadow:0 0 22px rgba(100,140,255,0.22); }
+@keyframes mic-p { 0%,100%{box-shadow:0 0 18px rgba(100,140,255,.22)} 50%{box-shadow:0 0 36px rgba(100,140,255,.42)} }
+#btn-send { background:rgba(100,140,255,0.16); border-color:rgba(140,180,255,0.26); color:rgba(185,210,255,0.9); }
+
+#ghost-meta { display:flex; gap:12px; align-items:center; }
+.meta-btn { background:none; border:none; color:var(--t3); font-size:16px; cursor:pointer; padding:4px; transition:color .2s; -webkit-appearance:none; }
+.meta-btn:active { color:var(--t2); }
+#meta-lbl { font-size:9px; letter-spacing:2.5px; color:var(--t3); text-transform:uppercase; font-weight:200; }
+
+/* ═══════════════════════════════════════════════════
+   STILL WATER — overload intervention
+═══════════════════════════════════════════════════ */
+#still-water {
+  position:fixed; inset:0; z-index:80;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  background:rgba(0,0,8,0.94);
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  opacity:0; pointer-events:none;
+  transition:opacity 1.3s ease; padding:0 32px; text-align:center;
+}
+#still-water.on { opacity:1; pointer-events:all; }
+
+.sw-orb { width:90px; height:90px; border-radius:50%; background:radial-gradient(circle,rgba(120,210,170,0.18) 0%,transparent 70%); border:1px solid rgba(120,210,170,0.18); margin:0 auto 24px; animation:sw-b 5s ease-in-out infinite; box-shadow:0 0 36px rgba(90,190,150,0.1); }
+@keyframes sw-b { 0%,100%{transform:scale(1);box-shadow:0 0 36px rgba(90,190,150,.1)} 50%{transform:scale(1.09);box-shadow:0 0 60px rgba(90,190,150,.2)} }
+
+.sw-h { font-family:var(--fd); font-size:26px; font-weight:300; font-style:italic; color:rgba(170,225,205,0.9); margin-bottom:9px; line-height:1.3; }
+.sw-p { font-size:13px; font-weight:200; color:var(--t2); margin-bottom:28px; line-height:1.75; letter-spacing:.2px; }
+
+.sw-breathe { display:flex; align-items:center; justify-content:center; gap:7px; margin-bottom:32px; }
+.sw-b-lbl { font-size:9px; letter-spacing:2px; color:var(--t3); text-transform:uppercase; }
+.sw-b-bar { width:34px; height:3px; border-radius:2px; background:rgba(120,210,170,0.18); overflow:hidden; }
+.sw-b-bar::after { content:''; display:block; width:100%; height:100%; background:rgba(120,210,170,0.65); transform:scaleX(0); transform-origin:left; animation:sw-fill 5s ease-in-out infinite; border-radius:2px; }
+.sw-b-bar:nth-child(3)::after{animation-delay:.15s}.sw-b-bar:nth-child(4)::after{animation-delay:.3s}.sw-b-bar:nth-child(5)::after{animation-delay:.45s}
+@keyframes sw-fill { 0%,100%{transform:scaleX(0)} 42%,58%{transform:scaleX(1)} }
+
+#sw-frida-msg { font-family:var(--fd); font-size:17px; font-weight:300; font-style:italic; color:rgba(190,225,210,0.82); margin-bottom:26px; line-height:1.55; min-height:26px; transition:opacity .5s; }
+
+#sw-exit { background:rgba(120,210,170,0.09); border:1px solid rgba(120,210,170,0.18); border-radius:26px; padding:11px 28px; font-family:var(--fu); font-size:11px; font-weight:300; letter-spacing:2px; text-transform:uppercase; color:rgba(150,220,190,0.65); cursor:pointer; -webkit-appearance:none; transition:all .3s; display:none; }
+#sw-exit.show { display:block; }
+#sw-exit:active { transform:scale(.96); opacity:.75; }
+
+/* ═══════════════════════════════════════════════════
+   RECOVERY PANEL
+═══════════════════════════════════════════════════ */
+#recovery-panel {
+  position:fixed; inset:0; z-index:70;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:0 26px; text-align:center;
+  background:rgba(0,0,8,0.78);
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  opacity:0; pointer-events:none; transition:opacity 1s ease;
+}
+#recovery-panel.on { opacity:1; pointer-events:all; }
+
+.rec-lbl { font-size:9px; font-weight:300; letter-spacing:3px; text-transform:uppercase; color:rgba(120,210,170,0.38); margin-bottom:18px; }
+.rec-title { font-family:var(--fd); font-size:24px; font-weight:300; color:rgba(170,225,205,0.9); margin-bottom:7px; font-style:italic; }
+.rec-sub { font-size:12px; font-weight:200; color:var(--t2); margin-bottom:30px; letter-spacing:.2px; line-height:1.65; }
+
+#rec-card { width:100%; background:rgba(120,210,170,0.06); border:1px solid rgba(120,210,170,0.16); border-radius:18px; padding:20px 18px; margin-bottom:26px; position:relative; overflow:hidden; }
+#rec-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(120,210,170,0.38),transparent); }
+.rc-lbl { font-size:9px; font-weight:500; letter-spacing:2px; text-transform:uppercase; color:rgba(120,210,170,0.45); margin-bottom:8px; }
+#rec-action { font-size:17px; font-weight:400; color:var(--t1); line-height:1.45; }
+
+#rec-done { background:rgba(120,210,170,0.09); border:1px solid rgba(120,210,170,0.18); border-radius:26px; padding:11px 32px; font-family:var(--fu); font-size:11px; font-weight:300; letter-spacing:2px; text-transform:uppercase; color:rgba(150,220,190,0.65); cursor:pointer; -webkit-appearance:none; transition:all .3s; margin-bottom:14px; }
+#rec-done:active { transform:scale(.96); opacity:.75; }
+.rec-note { font-size:10px; color:var(--t3); letter-spacing:.4px; line-height:1.65; }
+
+/* ═══════════════════════════════════════════════════
+   BIO ALERT
+═══════════════════════════════════════════════════ */
+#bio-alert {
+  position:fixed; top:calc(var(--safe-top) + 50px); left:14px; right:14px; z-index:300;
+  background:rgba(248,70,90,0.09); border:1px solid rgba(248,70,90,0.26); border-radius:15px;
+  padding:11px 15px; display:flex; align-items:center; gap:10px;
+  transform:translateY(-140%); transition:transform .5s cubic-bezier(0.34,1.2,.64,1);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); pointer-events:none;
+}
+#bio-alert.on { transform:translateY(0); pointer-events:all; }
+.ba-icon { font-size:17px; flex-shrink:0; }
+.ba-body { flex:1; }
+.ba-title { font-size:12px; font-weight:400; color:rgba(255,120,140,0.9); }
+.ba-sub   { font-size:10px; color:var(--t2); margin-top:1px; font-weight:200; }
+.ba-cta   { font-size:10px; font-weight:300; letter-spacing:1.5px; text-transform:uppercase; color:rgba(255,120,140,0.75); background:rgba(248,70,90,0.12); border:1px solid rgba(248,70,90,0.22); border-radius:9px; padding:6px 11px; cursor:pointer; -webkit-appearance:none; flex-shrink:0; }
+
+/* ═══════════════════════════════════════════════════
+   ONBOARDING — zero friction emotional entry
+═══════════════════════════════════════════════════ */
+#onboarding {
+  position:fixed; inset:0; z-index:400;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  background:rgba(0,0,8,0.97);
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  padding:0 28px; text-align:center;
+  opacity:0; pointer-events:none; transition:opacity .6s ease;
+}
+#onboarding.on { opacity:1; pointer-events:all; }
+
+.ob-step { display:none; flex-direction:column; align-items:center; width:100%; }
+.ob-step.on { display:flex; }
+
+.ob-orb-mini { width:70px; height:70px; border-radius:50%; background:radial-gradient(circle,rgba(120,160,255,0.18) 0%,transparent 70%); border:1px solid rgba(120,160,255,0.2); margin-bottom:22px; animation:ring-breathe 4s ease-in-out infinite; box-shadow:0 0 30px rgba(90,130,220,0.1); }
+
+.ob-title { font-family:var(--fd); font-size:30px; font-weight:300; font-style:italic; color:rgba(200,218,255,0.92); margin-bottom:8px; line-height:1.25; }
+.ob-sub { font-size:13px; font-weight:200; color:var(--t2); margin-bottom:32px; line-height:1.75; letter-spacing:.15px; max-width:300px; }
+
+/* Option A — instant launch */
+#ob-launch-btn {
+  width:100%; max-width:320px; padding:16px;
+  background:linear-gradient(135deg,rgba(120,160,255,0.22),rgba(100,140,240,0.14));
+  border:1px solid rgba(140,180,255,0.3);
+  border-radius:18px; font-family:var(--fu); font-size:15px;
+  font-weight:400; letter-spacing:.5px; color:rgba(200,220,255,0.92);
+  cursor:pointer; -webkit-appearance:none; transition:all .25s;
+  margin-bottom:12px; position:relative; overflow:hidden;
+  box-shadow:0 0 30px rgba(100,140,255,0.1);
+}
+#ob-launch-btn:active { transform:scale(.97); opacity:.85; }
+#ob-launch-btn::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(180,210,255,0.4),transparent); }
+
+.ob-launch-label { font-size:10px; color:rgba(140,180,255,0.5); margin-bottom:20px; letter-spacing:.3px; }
+
+/* Advanced toggle */
+.ob-advanced-toggle { font-size:11px; color:var(--t3); cursor:pointer; letter-spacing:1px; text-transform:uppercase; font-weight:300; margin-bottom:16px; padding:6px; }
+.ob-advanced-toggle:active { color:var(--t2); }
+
+#ob-advanced { display:none; width:100%; max-width:320px; }
+#ob-advanced.on { display:block; }
+
+.ob-prov-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:11px; }
+.ob-prov { background:rgba(255,255,255,0.03); border:1.5px solid rgba(255,255,255,0.07); border-radius:13px; padding:11px 10px; cursor:pointer; text-align:center; transition:all .28s; touch-action:manipulation; }
+.ob-prov.on { background:rgba(100,140,255,0.1); border-color:rgba(140,180,255,0.3); }
+.ob-prov:active { transform:scale(.93); }
+.op-logo { font-size:17px; margin-bottom:4px; }
+.op-name { font-size:12px; font-weight:400; color:var(--t1); margin-bottom:1px; }
+.op-cost { font-size:9px; color:rgba(100,200,160,0.7); font-weight:300; }
+
+.ob-input { width:100%; padding:12px 15px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:13px; font-family:var(--fu); font-size:13px; color:var(--t1); outline:none; margin-bottom:10px; -webkit-appearance:none; letter-spacing:.3px; font-weight:300; transition:border-color .3s; }
+.ob-input::placeholder { color:var(--t3); }
+.ob-input:focus { border-color:rgba(140,180,255,0.28); }
+
+.ob-save { width:100%; padding:13px; background:rgba(100,140,255,0.16); border:1px solid rgba(140,180,255,0.24); border-radius:14px; font-family:var(--fu); font-size:12px; font-weight:300; letter-spacing:2px; text-transform:uppercase; color:rgba(195,215,255,0.85); cursor:pointer; -webkit-appearance:none; transition:all .22s; }
+.ob-save:active { transform:scale(.97); opacity:.8; }
+
+.ob-beta-note { font-size:10px; color:var(--t3); text-align:center; line-height:1.7; margin-top:10px; letter-spacing:.2px; }
+.ob-beta-note a { color:rgba(140,180,255,0.4); text-decoration:none; }
+
+/* Step 2 — meet Frida */
+.ob-meeting-msg { font-family:var(--fd); font-size:19px; font-weight:300; font-style:italic; color:rgba(200,218,255,0.88); line-height:1.55; min-height:30px; margin-bottom:28px; }
+#ob-begin { width:100%; max-width:280px; padding:13px; background:rgba(120,210,170,0.1); border:1px solid rgba(120,210,170,0.22); border-radius:26px; font-family:var(--fu); font-size:11px; font-weight:300; letter-spacing:2.5px; text-transform:uppercase; color:rgba(150,220,190,0.72); cursor:pointer; -webkit-appearance:none; transition:all .25s; }
+#ob-begin:active { transform:scale(.96); opacity:.78; }
+
+/* ═══════════════════════════════════════════════════
+   SESSION LOCK
+═══════════════════════════════════════════════════ */
+#session-lock {
+  position:fixed; inset:0; z-index:500;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(0,0,8,0.98); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  opacity:0; pointer-events:none; transition:opacity .5s; text-align:center; padding:28px;
+}
+#session-lock.on { opacity:1; pointer-events:all; }
+
+.sl-orb { width:80px; height:80px; border-radius:50%; background:radial-gradient(circle,rgba(120,160,255,0.15) 0%,transparent 70%); border:1px solid rgba(120,160,255,0.18); margin:0 auto 24px; animation:ring-breathe 5s ease-in-out infinite; }
+.sl-title { font-family:var(--fd); font-size:24px; font-weight:300; font-style:italic; color:rgba(200,218,255,0.88); margin-bottom:8px; }
+.sl-sub { font-size:12px; color:var(--t2); margin-bottom:28px; font-weight:200; letter-spacing:.2px; }
+
+.sl-pin-row { display:flex; gap:10px; justify-content:center; margin-bottom:20px; }
+.sl-dot { width:12px; height:12px; border-radius:50%; border:1.5px solid rgba(140,180,255,0.3); transition:all .2s; }
+.sl-dot.filled { background:rgba(140,180,255,0.7); border-color:rgba(160,200,255,0.6); }
+
+.sl-keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:250px; }
+.sl-key { padding:16px 10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; font-size:20px; font-weight:300; color:var(--t1); cursor:pointer; transition:all .15s; -webkit-appearance:none; font-family:var(--fu); }
+.sl-key:active { background:rgba(140,180,255,0.12); transform:scale(.93); }
+.sl-key.wide { grid-column:span 2; font-size:13px; letter-spacing:1px; }
+
+/* ═══════════════════════════════════════════════════
+   SETTINGS SHEET
+═══════════════════════════════════════════════════ */
+#settings-ov {
+  position:fixed; inset:0; z-index:300;
+  display:flex; align-items:flex-end; justify-content:center;
+  background:rgba(0,0,8,0.72); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  opacity:0; pointer-events:none; transition:opacity .4s;
+}
+#settings-ov.on { opacity:1; pointer-events:all; }
+
+.sh-sheet {
+  background:rgba(5,6,18,0.97); border:1px solid rgba(255,255,255,0.07); border-radius:24px 24px 0 0;
+  padding:24px 20px calc(var(--safe-bottom) + 22px);
+  width:100%; max-width:460px;
+  transform:translateY(100%); transition:transform .5s cubic-bezier(0.34,1.2,.64,1);
+  max-height:86vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+}
+#settings-ov.on .sh-sheet { transform:translateY(0); }
+
+.sh-h { font-family:var(--fd); font-size:22px; font-weight:300; font-style:italic; color:var(--t1); margin-bottom:3px; }
+.sh-sub { font-size:9px; font-weight:300; letter-spacing:2px; color:var(--t3); text-transform:uppercase; margin-bottom:20px; }
+.sh-lbl { font-size:9px; font-weight:400; letter-spacing:2px; text-transform:uppercase; color:var(--t3); margin-bottom:8px; }
+.sh-div { border:none; border-top:1px solid rgba(255,255,255,0.05); margin:16px 0; }
+
+.sh-input { width:100%; padding:11px 14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; font-family:var(--fu); font-size:12px; color:var(--t1); outline:none; margin-bottom:9px; -webkit-appearance:none; font-weight:300; transition:border-color .3s; }
+.sh-input::placeholder { color:var(--t3); }
+.sh-input:focus { border-color:rgba(140,180,255,0.26); }
+
+.sh-toggle-row { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+.sh-toggle-lbl { font-size:13px; font-weight:300; color:var(--t1); }
+.sh-toggle-desc { font-size:10px; color:var(--t3); margin-top:1px; }
+
+.t-pill { width:42px; height:22px; border-radius:11px; background:rgba(255,255,255,0.09); border:1px solid rgba(255,255,255,0.1); position:relative; cursor:pointer; transition:all .3s; flex-shrink:0; }
+.t-pill.on { background:rgba(90,190,150,0.28); border-color:rgba(110,210,170,0.38); }
+.t-dot { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:rgba(255,255,255,0.55); transition:transform .3s cubic-bezier(0.34,1.2,.64,1); }
+.t-pill.on .t-dot { transform:translateX(20px); background:rgba(130,215,185,0.9); }
+
+.sh-save { width:100%; padding:12px; background:rgba(100,140,255,0.16); border:1px solid rgba(140,180,255,0.22); border-radius:13px; font-family:var(--fu); font-size:12px; font-weight:300; letter-spacing:2px; text-transform:uppercase; color:rgba(190,215,255,0.82); cursor:pointer; -webkit-appearance:none; transition:all .2s; margin-bottom:9px; }
+.sh-save:active { transform:scale(.97); opacity:.8; }
+.sh-note { font-size:10px; color:var(--t3); text-align:center; line-height:1.7; }
+.sh-note a { color:rgba(140,180,255,0.4); text-decoration:none; }
+
+/* ─── UTILITIES ─── */
+@keyframes fade-in { from{opacity:0} to{opacity:1} }
+.hidden { display:none!important; }
+
+/* ─── Fix 4: READABILITY — minimum font sizes ─── */
+/* Body / input: 16px min */
+#txt-in        { font-size:16px; }
+.ob-input      { font-size:16px; }
+.sh-input      { font-size:16px; }
+/* Panel text: 18px typed, 15px items */
+.panel-typed   { font-size:18px; line-height:1.65; }
+.pi-text       { font-size:15px; }
+.pi-meta       { font-size:12px; }
+/* Buttons: 13-14px */
+.panel-btn     { font-size:13px; }
+.g-btn         { font-size:18px; }
+.qs-pill       { font-size:11px; }
+/* Labels: 11px minimum where possible */
+.sh-lbl        { font-size:11px; }
+.sh-toggle-lbl { font-size:15px; }
+.sh-toggle-desc{ font-size:12px; }
+.sh-sub        { font-size:11px; }
+/* Contrast boosts */
+.panel-typed   { color:rgba(220,230,255,0.92); }
+.pi-text       { color:rgba(255,255,255,0.90); }
+#orb-status    { font-size:10px; color:rgba(255,255,255,0.32); }
+.ob-sub        { font-size:14px; color:rgba(255,255,255,0.62); }
+.rec-sub       { font-size:14px; color:rgba(255,255,255,0.62); }
+.commit-chip   { font-size:12px; }
+.ot-text       { font-size:18px; }
+.rot-label, .one-thing-card .ot-label { font-size:11px; }
+
+/* ─── Fix 5: TABLET BREAKPOINT ─── */
+@media (min-width: 700px) {
+  #orb-wrap {
+    width: 300px;
+    height: 300px;
+  }
+  #orb-canvas {
+    inset: -60px;
+    width: calc(100% + 120px);
+    height: calc(100% + 120px);
+  }
+  #orb-panel {
+    width: min(560px, 82vw);
+  }
+  #ghost-bottom {
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .panel-typed { font-size: 19px; }
+  .pi-text     { font-size: 16px; }
+  .ob-title    { font-size: 34px; }
+  .ob-sub      { font-size: 16px; max-width: 440px; }
+  #speech-txt  { font-size: 24px; }
+  #quick-strip { gap: 9px; }
+  .qs-pill     { font-size: 12px; padding: 8px 17px; }
+  .sh-sheet    { max-width: 560px; }
+  #still-water, #recovery-panel, #onboarding { padding: 0 60px; }
+}
+
+/* ─── iOS SAFARI FIXES ─── */
+/* Prevent iOS input zoom (font-size must be ≥16px on iOS) */
+@supports (-webkit-touch-callout: none) {
+  #txt-in        { font-size: 16px !important; }
+  .ob-input      { font-size: 16px !important; }
+  .sh-input      { font-size: 16px !important; }
+  #ob-key        { font-size: 16px !important; }
+  #sh-key        { font-size: 16px !important; }
+  #sh-tts-key    { font-size: 16px !important; }
+
+  /* iOS momentum scrolling for sheets */
+  .sh-sheet, #ob-advanced { -webkit-overflow-scrolling: touch; }
+
+  /* iOS safe area bottom — extra breathing room for home indicator */
+  #ghost-bottom { padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 18px); }
+
+  /* Fix iOS button appearance */
+  button, input { -webkit-appearance: none; border-radius: 0; }
+
+  /* iOS backdrop-filter always needs -webkit- prefix */
+  .qs-pill, #txt-in, #orb-panel, #bio-alert, #still-water, #recovery-panel, #onboarding, #session-lock, #settings-ov .sh-sheet {
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  }
+}
 </style>
 </head>
 <body>
 
-<div id="atmo">
-  <div class="orb" id="o1"></div>
-  <div class="orb" id="o2"></div>
-  <div class="orb" id="o3"></div>
-  <div class="orb" id="o4"></div>
-</div>
+<div id="void"></div>
 
-<!-- Status Bar -->
-<div id="sb">
-  <div class="sb-time" id="sbt">9:41</div>
-  <div class="sb-icons">
-    <div id="sb-hr-badge">♥ --</div>
-    <span>5G</span><span>📶</span><span>🔋</span>
+<!-- Privacy badge — centered, always visible when active -->
+<div id="privacy-badge-main">🔒 Privacy Mode</div>
+
+<!-- Top bar -->
+<div id="top-bar">
+  <div class="tb-left">
+    <span id="sb-time">9:41</span>
+    <span id="mode-badge">●</span>
+  </div>
+  <div class="tb-right">
+    <div id="privacy-badge-top">🔒 Privacy</div>
+    <button id="kill-btn" onclick="Engine.killSwitch()" title="Stop everything">■</button>
   </div>
 </div>
 
-<!-- Stress Alert Banner -->
-<div id="stress-alert">
-  <div class="sa-icon">💗</div>
-  <div class="sa-text">
-    <div class="sa-title">Elevated Stress Detected</div>
-    <div class="sa-sub" id="sa-sub">Heart rate elevated. Frida is here.</div>
+<!-- Bio alert -->
+<div id="bio-alert">
+  <div class="ba-icon">💗</div>
+  <div class="ba-body">
+    <div class="ba-title">Elevated stress detected</div>
+    <div class="ba-sub" id="ba-sub">Frida is switching to Still Water.</div>
   </div>
-  <button class="sa-btn" onclick="handleStressAlert()">Breathe →</button>
+  <button class="ba-cta" onclick="Engine.acknowledgeAlert()">Breathe</button>
 </div>
 
-<!-- App -->
-<div id="app">
-  <div id="hdr">
-    <div id="avatar">🌸</div>
-    <div id="hdr-text">
-      <h1>Frida</h1>
-      <div class="sub" id="hdr-sub">Your executive function, amplified</div>
-    </div>
-    <button id="key-btn" onclick="openKeyModal()">API Key</button>
+<!-- Frida Stage -->
+<div id="stage">
+  <div id="speech-wrap">
+    <div id="speech-lbl">Frida</div>
+    <div id="speech-txt"></div>
   </div>
 
-  <div id="mode-bar">
-    <div class="mpill active" data-m="ambient"  onclick="setMode('ambient')"><div class="dot" style="color:#3b7ef8"></div>👂 Listen</div>
-    <div class="mpill"        data-m="regulate" onclick="setMode('regulate')"><div class="dot" style="color:#2ec4a9"></div>📋 Regulate</div>
-    <div class="mpill"        data-m="calm"     onclick="setMode('calm')"><div class="dot" style="color:#9b74f0"></div>🧘 Calm</div>
-    <div class="mpill"        data-m="launch"   onclick="setMode('launch')"><div class="dot" style="color:#f87c3b"></div>🚀 Launch</div>
-    <div class="mpill"        data-m="bio"      onclick="setMode('bio')" id="bio-pill"><div class="dot" style="color:#f84b7a"></div>💗 Bio</div>
-  </div>
-
-  <div id="scroll">
-
-    <!-- Frida response -->
-    <div id="frida-resp">
-      <div class="fr-lbl">Frida</div>
-      <div id="fr-txt"></div>
-    </div>
-
-    <!-- ══ AMBIENT ══ -->
-    <div class="panel active" id="p-ambient">
-      <div class="gc">
-        <div class="listen-core">
-          <div id="mic-orb" onclick="toggleListen()">🎙️</div>
-          <div class="ls-status" id="ls-stat">Tap to start listening</div>
-          <div class="ls-hint" id="ls-hint">Frida catches commitments, names & times</div>
-        </div>
-      </div>
-      <div class="gc">
-        <div class="gc-p" style="padding-bottom:6px"><div class="sec-label">Caught This Session</div></div>
-        <div id="tfeed">
-          <div class="tbub commit">
-            <div class="tm"><span>⚡ EXAMPLE</span><span>now</span></div>
-            <span style="font-size:12px;opacity:.6">"Call the school at 3pm"</span><br>
-            <span style="font-size:13px">Commitment logged: Call school · 3:00 PM · Priority: high</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ REGULATE ══ -->
-    <div class="panel" id="p-regulate">
-      <div class="gc">
-        <div class="gc-p" style="padding-bottom:10px">
-          <div class="reg-greeting" id="reg-greet">Good morning, Jeff</div>
-          <div class="reg-snap" id="reg-snap">Here's what needs your attention</div>
-        </div>
-        <div class="gc-p" style="padding-top:0">
-          <div class="next-card" id="next-card">
-            <div class="nc-lbl">⚡ Next Up</div>
-            <div class="nc-title" id="nc-title">Nothing scheduled yet</div>
-            <div class="nc-time"  id="nc-time">Tell Frida what's on your plate</div>
-          </div>
-          <div class="sec-label">Today's Commitments</div>
-          <div id="task-list"></div>
-        </div>
-      </div>
-      <div class="gc gc-p">
-        <div class="sec-label">Ask Frida</div>
-        <div style="font-size:13px;color:var(--text-2);line-height:1.6">Try: "What should I do first?" · "Add: call dentist tomorrow at 10" · "I'm overwhelmed, pick one thing"</div>
-      </div>
-    </div>
-
-    <!-- ══ CALM ══ -->
-    <div class="panel" id="p-calm">
-      <div class="gc">
-        <div class="calm-top">
-          <div class="calm-orb">🌊</div>
-          <div class="calm-msg" id="calm-msg">"You don't have to do everything right now."</div>
-          <div class="calm-sub" id="calm-sub">Breathe with me for a moment. Your nervous system is processing a lot.</div>
-          <div class="breathe-row">
-            <span class="blbl">Breathe</span>
-            <div class="bbar"></div><div class="bbar"></div><div class="bbar"></div><div class="bbar"></div>
-          </div>
-        </div>
-      </div>
-      <div class="gc">
-        <div class="gc-p" style="padding-bottom:6px"><div class="sec-label">Talk to Frida</div></div>
-        <div class="calm-chat" id="calm-chat">
-          <div class="cbub f">I'm here. What's going on? You don't have to sort it out — just say it.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ LAUNCH ══ -->
-    <div class="panel" id="p-launch">
-      <div class="gc">
-        <div class="launch-top">
-          <div class="l-icon">🚀</div>
-          <div class="l-q">What's the one thing?</div>
-          <div class="l-sub">You don't need a whole plan. Just the very next physical action.</div>
-          <div class="one-card">
-            <div class="one-lbl">⚡ Your One Thing</div>
-            <div class="one-txt" id="one-txt">Ask Frida: "Help me pick one thing to start with"</div>
-          </div>
-        </div>
-      </div>
-      <div class="gc gc-p">
-        <div class="sec-label">Breaking It Down</div>
-        <div id="lsteps">
-          <div class="lstep"><div class="snum">1</div><div class="stxt">Tell Frida what you're trying to do — even vaguely</div></div>
-          <div class="lstep"><div class="snum">2</div><div class="stxt">She finds the single smallest physical next action</div></div>
-          <div class="lstep"><div class="snum">3</div><div class="stxt">Do just that — nothing else counts right now</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ BIO DASHBOARD ══ -->
-    <div class="panel" id="p-bio">
-
-      <!-- Vitals row -->
-      <div class="bio-vitals">
-        <div class="vital-card" id="vc-hr">
-          <div class="vc-icon">💗</div>
-          <div class="vc-lbl">Heart Rate</div>
-          <div class="vc-val" id="vv-hr">--</div>
-          <div class="vc-unit">BPM</div>
-          <div class="vc-trend" id="vt-hr">— No data</div>
-        </div>
-        <div class="vital-card" id="vc-hrv">
-          <div class="vc-icon">〰️</div>
-          <div class="vc-lbl">HRV</div>
-          <div class="vc-val" id="vv-hrv">--</div>
-          <div class="vc-unit">ms RMSSD</div>
-          <div class="vc-trend" id="vt-hrv">— No data</div>
-        </div>
-        <div class="vital-card" id="vc-spo2">
-          <div class="vc-icon">🫁</div>
-          <div class="vc-lbl">SpO₂</div>
-          <div class="vc-val" id="vv-spo2">--</div>
-          <div class="vc-unit">% Oxygen</div>
-          <div class="vc-trend" id="vt-spo2">— No data</div>
-        </div>
-        <div class="vital-card" id="vc-stress">
-          <div class="vc-icon">🧠</div>
-          <div class="vc-lbl">Stress</div>
-          <div class="vc-val" id="vv-stress">--</div>
-          <div class="vc-unit">/ 100</div>
-          <div class="vc-trend" id="vt-stress">— No data</div>
-        </div>
-      </div>
-
-      <!-- Stress ring -->
-      <div class="gc" style="margin-bottom:14px">
-        <div class="stress-ring-wrap">
-          <div class="ring-container">
-            <svg width="150" height="150" viewBox="0 0 150 150">
-              <circle class="ring-bg" cx="75" cy="75" r="60"/>
-              <circle class="ring-fill" id="stress-ring" cx="75" cy="75" r="60"
-                stroke="#2ec4a9"
-                stroke-dasharray="377"
-                stroke-dashoffset="377"/>
-            </svg>
-            <div class="ring-center">
-              <div class="ring-val" id="ring-val">0</div>
-              <div class="ring-sub">Stress</div>
-            </div>
-          </div>
-          <div class="stress-lbl" id="stress-state">Awaiting Data</div>
-          <div class="stress-desc" id="stress-desc">Connect a device below or use the Apple Shortcuts bridge to start streaming biometric data.</div>
-        </div>
-      </div>
-
-      <!-- HR Sparkline -->
-      <div class="gc" style="margin-bottom:14px">
-        <div class="gc-p" style="padding-bottom:8px"><div class="sec-label">Heart Rate History</div></div>
-        <div class="hr-chart-wrap">
-          <div class="hr-chart"><canvas id="hr-canvas"></canvas></div>
-        </div>
-        <div style="padding:8px 18px 14px;display:flex;justify-content:space-between">
-          <span style="font-size:11px;color:var(--text-3)">Threshold: <span id="thresh-display" style="color:var(--mode-bio);font-weight:700">100</span> BPM</span>
-          <span style="font-size:11px;color:var(--text-3)" id="hr-last-update">No readings yet</span>
-        </div>
-      </div>
-
-      <!-- Device connections -->
-      <div class="gc" style="margin-bottom:14px">
-        <div class="gc-p" style="padding-bottom:6px"><div class="sec-label">Device Bridge</div></div>
-        <div class="conn-panel">
-
-          <div class="conn-row" onclick="openShortcutsGuide()">
-            <div class="conn-icon">⌚</div>
-            <div class="conn-info">
-              <div class="conn-name">Apple Watch · Shortcuts Bridge</div>
-              <div class="conn-desc">iOS Shortcuts → FDP HTTP endpoint</div>
-            </div>
-            <div class="conn-status" id="aw-status" style="background:rgba(59,126,248,.15);color:#3b7ef8;border:1px solid rgba(59,126,248,.25)">Setup →</div>
-          </div>
-
-          <div class="conn-row" id="ble-row" onclick="connectBLE()">
-            <div class="conn-icon">🔵</div>
-            <div class="conn-info">
-              <div class="conn-name">Samsung Galaxy Watch · BLE</div>
-              <div class="conn-desc">Web Bluetooth — tap to scan nearby devices</div>
-            </div>
-            <div class="conn-status off" id="ble-status">Scan</div>
-          </div>
-
-          <div class="conn-row" onclick="injectDemo()">
-            <div class="conn-icon">🎛️</div>
-            <div class="conn-info">
-              <div class="conn-name">Demo Mode</div>
-              <div class="conn-desc">Simulate live biometric stream</div>
-            </div>
-            <div class="conn-status ready" id="demo-status">Start</div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Thresholds -->
-      <div class="gc" style="margin-bottom:14px">
-        <div class="gc-p" style="padding-bottom:6px"><div class="sec-label">Alert Thresholds</div></div>
-        <div style="padding:0 18px 14px">
-          <div class="thresh-row">
-            <div class="thresh-lbl">💗 HR Alert (BPM)</div>
-            <button class="thresh-btn" onclick="adjThresh('hr',-5)">−</button>
-            <div class="thresh-val" id="thr-hr">100</div>
-            <button class="thresh-btn" onclick="adjThresh('hr',+5)">+</button>
-          </div>
-          <div class="thresh-row">
-            <div class="thresh-lbl">🧠 Stress Alert (/100)</div>
-            <button class="thresh-btn" onclick="adjThresh('stress',-5)">−</button>
-            <div class="thresh-val" id="thr-stress">65</div>
-            <button class="thresh-btn" onclick="adjThresh('stress',+5)">+</button>
-          </div>
-          <div class="thresh-row">
-            <div class="thresh-lbl">〰️ HRV Low Alert (ms)</div>
-            <button class="thresh-btn" onclick="adjThresh('hrv',-5)">−</button>
-            <div class="thresh-val" id="thr-hrv">20</div>
-            <button class="thresh-btn" onclick="adjThresh('hrv',+5)">+</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- FDP Live Log -->
-      <div class="gc" style="margin-bottom:14px">
-        <div class="gc-p" style="padding-bottom:6px">
-          <div class="sec-label">FDP Live Log
-            <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3);font-size:9px"> · Frida Device Protocol v1.1</span>
-          </div>
-        </div>
-        <div class="fdp-log" id="fdp-log">
-          <div class="fdp-entry sys">[FDP v1.1] Frida Device Protocol initialized</div>
-          <div class="fdp-entry sys">[FDP v1.1] Awaiting device connection...</div>
-        </div>
-      </div>
-
-    </div><!-- /p-bio -->
-
-    <div class="spc"></div>
-  </div><!-- /scroll -->
-</div><!-- /app -->
-
-<!-- Input Bar -->
-<div id="ibar">
-  <button class="ibtn" id="mic-btn" onclick="toggleVoice()">🎙️</button>
-  <input type="text" id="txt-in" placeholder="Talk to Frida..." autocomplete="off" autocorrect="on" spellcheck="true">
-  <button class="ibtn" id="send-btn" onclick="sendMsg()">↑</button>
-</div>
-
-<!-- Multi-Provider Key Modal -->
-<div id="key-modal">
-  <div class="ksheet">
-    <h2>Connect Frida's Brain</h2>
-    <p>Choose your AI provider. Your key is stored only on this device — never sent anywhere except directly to your chosen provider.</p>
-
-    <!-- Provider Selector -->
-    <div id="provider-grid">
-      <div class="prov-card active" data-p="anthropic" onclick="selectProvider('anthropic')">
-        <div class="prov-logo">🟠</div>
-        <div class="prov-name">Claude</div>
-        <div class="prov-sub">Anthropic · Best quality</div>
-        <div class="prov-cost">~$5 credit to start</div>
-      </div>
-      <div class="prov-card" data-p="gemini" onclick="selectProvider('gemini')">
-        <div class="prov-logo">🔵</div>
-        <div class="prov-name">Gemini</div>
-        <div class="prov-sub">Google · Free tier</div>
-        <div class="prov-cost">Free up to 15 RPM</div>
-      </div>
-      <div class="prov-card" data-p="groq" onclick="selectProvider('groq')">
-        <div class="prov-logo">⚡</div>
-        <div class="prov-name">Groq</div>
-        <div class="prov-sub">Groq Cloud · Very fast</div>
-        <div class="prov-cost">Free tier available</div>
-      </div>
-      <div class="prov-card" data-p="openai" onclick="selectProvider('openai')">
-        <div class="prov-logo">🟢</div>
-        <div class="prov-name">GPT-4o</div>
-        <div class="prov-sub">OpenAI · Reliable</div>
-        <div class="prov-cost">Pay per use</div>
-      </div>
-    </div>
-
-    <!-- Key input — label changes per provider -->
-    <div id="prov-hint" class="prov-hint-box"></div>
-    <input type="password" id="ki" placeholder="Paste your API key..." autocomplete="off">
-    <button class="ksave" onclick="saveKey()">Activate Frida</button>
-    <div class="knote" id="prov-link-note"></div>
+  <div id="orb-wrap" onclick="UI.orbTap()">
+    <canvas id="orb-canvas"></canvas>
+    <div class="o-ring"></div>
+    <div class="o-ring"></div>
+    <div class="o-ring"></div>
+    <div id="orb-core"></div>
+    <div id="think-dots"><div class="td"></div><div class="td"></div><div class="td"></div></div>
+    <div id="orb-name">Frida</div>
+    <div id="orb-status">tap to begin</div>
   </div>
 </div>
 
-<!-- Shortcuts Setup Guide -->
-<div id="sc-modal">
-  <div class="sc-sheet">
-    <h2>⌚ Apple Watch Bridge Setup</h2>
-    <div class="sc-step"><div class="sc-num">1</div><div class="sc-txt">On your iPhone, open the <strong>Shortcuts</strong> app and create a new Automation: <em>When Heart Rate rises above X</em> (or on a repeating timer).</div></div>
-    <div class="sc-step"><div class="sc-num">2</div><div class="sc-txt">Add a <strong>Get My Heart Rate</strong> action to read the current value from HealthKit.</div></div>
-    <div class="sc-step"><div class="sc-num">3</div><div class="sc-txt">Add a <strong>Get Contents of URL</strong> action. Set method to <code>POST</code>, URL to your Frida deployment URL + <code>/fdp</code> (e.g. <code>https://your-frida.netlify.app/fdp</code>). Set body type to JSON.</div></div>
-    <div class="sc-step"><div class="sc-num">4</div><div class="sc-txt">Set the JSON body to:<br><code>{"device":"apple_watch","metric":"hr","value": [Shortcut Variable: Heart Rate], "timestamp": [Shortcut Variable: Current Date]}</code></div></div>
-    <div class="sc-step"><div class="sc-num">5</div><div class="sc-txt">Run the Shortcut manually once to test. Frida's FDP log will show the incoming reading. After confirming, set the automation to run every 1–5 minutes.</div></div>
-    <div class="sc-step"><div class="sc-num">6</div><div class="sc-txt"><strong>Alternative (no server):</strong> Tap <em>Demo Mode</em> on the Bio dashboard to simulate live data right now, or manually POST to Frida's <code>window.FDP.ingest()</code> from any automation tool.</div></div>
-    <button class="sc-close" onclick="closeShortcutsGuide()">Got it</button>
+<!-- ORB PANEL — transforms when cognition is needed -->
+<div id="orb-panel">
+  <div class="panel-header">
+    <div class="panel-title" id="panel-title">Daily Summary</div>
+    <button class="panel-close" onclick="Panel.close()">✕</button>
+  </div>
+  <div class="panel-body" id="panel-body">
+    <div class="panel-typed" id="panel-typed"></div>
+    <div class="panel-list" id="panel-list"></div>
+    <div class="panel-action-row" id="panel-actions"></div>
+  </div>
+</div>
+
+<!-- Ghost UI -->
+<div id="ghost-ui">
+  <div id="quick-strip">
+    <div class="qs-pill on" data-m="ambient"  onclick="UI.subMode('ambient')">Listen</div>
+    <div class="qs-pill"    data-m="regulate" onclick="UI.subMode('regulate')">Regulate</div>
+    <div class="qs-pill"    data-m="summary"  onclick="Panel.open('summary')">Summary</div>
+    <div class="qs-pill"    data-m="recall"   onclick="Panel.open('recall')">Recall</div>
+    <div class="qs-pill"    data-m="bio"      onclick="UI.subMode('bio')">Bio</div>
+  </div>
+
+  <div id="commit-stream"></div>
+
+  <div id="ghost-bottom">
+    <div id="input-row">
+      <button class="g-btn" id="btn-mic"  onclick="Voice.toggleInput()">🎙️</button>
+      <input  type="text"   id="txt-in"   placeholder="Say something to Frida..." autocomplete="off" spellcheck="true">
+      <button class="g-btn" id="btn-send" onclick="UI.send()">↑</button>
+    </div>
+    <div id="ghost-meta">
+      <button class="meta-btn" onclick="UI.openSettings()">⚙</button>
+      <span id="meta-lbl">Frida · NeuroForge</span>
+      <button class="meta-btn" onclick="Security.togglePrivacy()">🔒</button>
+    </div>
+  </div>
+</div>
+
+<!-- Still Water -->
+<div id="still-water">
+  <div class="sw-orb"></div>
+  <div class="sw-h">You're safe right now.</div>
+  <div class="sw-p">Your system hit its limit.<br>That's information, not failure.<br>Let's slow this down together.</div>
+  <div class="sw-breathe">
+    <span class="sw-b-lbl">Breathe</span>
+    <div class="sw-b-bar"></div><div class="sw-b-bar"></div>
+    <div class="sw-b-bar"></div><div class="sw-b-bar"></div>
+  </div>
+  <div id="sw-frida-msg"></div>
+  <button id="sw-exit" onclick="Engine.exitOverload()">I'm ready for one small step</button>
+</div>
+
+<!-- Recovery -->
+<div id="recovery-panel">
+  <div class="rec-lbl">Recovery · Decompression</div>
+  <div class="rec-title">One thing. That's all.</div>
+  <div class="rec-sub">No list. No dashboard.<br>Just the single smallest physical next action.</div>
+  <div id="rec-card">
+    <div class="rc-lbl">⚡ Your One Thing</div>
+    <div id="rec-action">Ask Frida what to do next.</div>
+  </div>
+  <button id="rec-done" onclick="Engine.completeRecovery()">Done — I'm regulated</button>
+  <div class="rec-note">You must complete Recovery before returning to normal.<br>This protects your nervous system.</div>
+</div>
+
+<!-- Onboarding -->
+<div id="onboarding">
+  <!-- Step 1: Choose path -->
+  <div class="ob-step on" id="ob-step-1">
+    <div class="ob-orb-mini"></div>
+    <div class="ob-title">Meet Frida.</div>
+    <div class="ob-sub">A cognitive stabilization companion.<br>She helps when your brain is at capacity.</div>
+
+    <button id="ob-launch-btn" onclick="Onboarding.launchInstant()">
+      ✦ &nbsp; Set Up Frida
+    </button>
+    <div class="ob-launch-label">Connect your AI key to begin beta testing</div>
+
+    <div class="ob-advanced-toggle" onclick="Onboarding.toggleAdvanced()">Choose your AI provider ▾</div>
+
+    <div id="ob-advanced">
+      <div class="ob-prov-grid">
+        <div class="ob-prov on" data-p="groq"      onclick="Onboarding.selProv('groq')"><div class="op-logo">⚡</div><div class="op-name">Groq</div><div class="op-cost">Free tier</div></div>
+        <div class="ob-prov"    data-p="anthropic" onclick="Onboarding.selProv('anthropic')"><div class="op-logo">🟠</div><div class="op-name">Claude</div><div class="op-cost">Best quality</div></div>
+        <div class="ob-prov"    data-p="gemini"    onclick="Onboarding.selProv('gemini')"><div class="op-logo">🔵</div><div class="op-name">Gemini</div><div class="op-cost">Free tier</div></div>
+        <div class="ob-prov"    data-p="openai"    onclick="Onboarding.selProv('openai')"><div class="op-logo">🟢</div><div class="op-name">GPT-4o</div><div class="op-cost">Pay per use</div></div>
+      </div>
+      <input class="ob-input" type="password" id="ob-key" placeholder="Paste your API key...">
+      <button class="ob-save" onclick="Onboarding.saveKey()">Connect & Continue</button>
+      <div class="ob-beta-note">⚠ Beta: Keys stored locally only. Use test keys.<br><a href="privacy.html" target="_blank">Privacy Policy →</a></div>
+    </div>
+  </div>
+
+  <!-- Step 2: Meet Frida (greeting) -->
+  <div class="ob-step" id="ob-step-2">
+    <div class="ob-orb-mini"></div>
+    <div class="ob-title">I'm Frida.</div>
+    <div class="ob-meeting-msg" id="ob-greeting-msg">I'm here to help when it's a lot.</div>
+    <button id="ob-begin" onclick="Onboarding.complete()">Begin →</button>
+  </div>
+</div>
+
+<!-- Session Lock -->
+<div id="session-lock">
+  <div class="sl-orb"></div>
+  <div class="sl-title">Frida is locked.</div>
+  <div class="sl-sub">Enter your PIN to continue.</div>
+  <div class="sl-pin-row" id="sl-dots">
+    <div class="sl-dot"></div><div class="sl-dot"></div>
+    <div class="sl-dot"></div><div class="sl-dot"></div>
+  </div>
+  <div class="sl-keypad" id="sl-keypad"></div>
+</div>
+
+<!-- Settings -->
+<div id="settings-ov">
+  <div class="sh-sheet">
+    <div class="sh-h">Settings</div>
+    <div class="sh-sub">Frida · NeuroForge v3.1</div>
+
+    <!-- Fix 3: Honest key storage disclosure -->
+    <div style="background:rgba(248,180,0,0.07);border:1px solid rgba(248,180,0,0.18);border-radius:12px;padding:10px 14px;margin-bottom:16px;font-size:12px;font-weight:300;color:rgba(248,200,100,0.7);line-height:1.6;">
+      ⚠ Beta: Your API key is stored locally on this device only.
+      It is never sent to Frida servers. Use a test key during beta.
+    </div>
+
+    <div class="sh-lbl">AI Provider</div>
+    <div class="ob-prov-grid" id="sh-prov-grid" style="margin-bottom:12px">
+      <div class="ob-prov" data-p="groq"      onclick="UI.selProv('groq')"><div class="op-logo">⚡</div><div class="op-name">Groq</div><div class="op-cost">Free</div></div>
+      <div class="ob-prov" data-p="anthropic" onclick="UI.selProv('anthropic')"><div class="op-logo">🟠</div><div class="op-name">Claude</div><div class="op-cost">Quality</div></div>
+      <div class="ob-prov" data-p="gemini"    onclick="UI.selProv('gemini')"><div class="op-logo">🔵</div><div class="op-name">Gemini</div><div class="op-cost">Free</div></div>
+      <div class="ob-prov" data-p="openai"    onclick="UI.selProv('openai')"><div class="op-logo">🟢</div><div class="op-name">GPT-4o</div><div class="op-cost">Paid</div></div>
+    </div>
+    <div class="sh-lbl">API Key</div>
+    <input class="sh-input" type="password" id="sh-key" placeholder="Paste key...">
+    <div style="display:flex;justify-content:flex-end;margin-top:-4px;margin-bottom:10px;">
+      <button onclick="UI.clearKey()" style="background:none;border:none;font-family:var(--fu);font-size:11px;color:rgba(248,120,120,0.5);cursor:pointer;letter-spacing:.5px;padding:4px 0;">Clear saved key ✕</button>
+    </div>
+
+    <hr class="sh-div">
+
+    <div class="sh-lbl">Voice Engine</div>
+    <div class="ob-prov-grid" id="sh-voice-grid" style="margin-bottom:12px">
+      <div class="ob-prov on" data-v="browser"    onclick="UI.selVoice('browser')"><div class="op-name">Browser</div><div class="op-cost">Free</div></div>
+      <div class="ob-prov"    data-v="groq-tts"   onclick="UI.selVoice('groq-tts')"><div class="op-name">Groq PlayAI</div><div class="op-cost">Free tier</div></div>
+      <div class="ob-prov"    data-v="openai-tts" onclick="UI.selVoice('openai-tts')"><div class="op-name">OpenAI Nova</div><div class="op-cost">Warm</div></div>
+      <div class="ob-prov"    data-v="elevenlabs" onclick="UI.selVoice('elevenlabs')"><div class="op-name">ElevenLabs</div><div class="op-cost">Natural</div></div>
+    </div>
+    <input class="sh-input hidden" type="password" id="sh-tts-key" placeholder="Voice API key (if different)...">
+
+    <hr class="sh-div">
+
+    <div class="sh-lbl">Privacy & Safety</div>
+    <div class="sh-toggle-row">
+      <div><div class="sh-toggle-lbl">Privacy Mode</div><div class="sh-toggle-desc">Disables mic, TTS, outbound requests</div></div>
+      <div class="t-pill" id="sh-privacy-t" onclick="Security.togglePrivacy()"><div class="t-dot"></div></div>
+    </div>
+    <div class="sh-toggle-row">
+      <div><div class="sh-toggle-lbl">Bio Hook</div><div class="sh-toggle-desc">Auto-trigger Still Water on stress spike</div></div>
+      <div class="t-pill on" id="sh-bio-t" onclick="BioHook.toggleEnabled()"><div class="t-dot"></div></div>
+    </div>
+    <div class="sh-toggle-row" style="border:none">
+      <div><div class="sh-toggle-lbl">Session PIN</div><div class="sh-toggle-desc">Lock Frida after inactivity</div></div>
+      <div class="t-pill" id="sh-pin-t" onclick="SessionLock.togglePin()"><div class="t-dot"></div></div>
+    </div>
+
+    <hr class="sh-div">
+    <button class="sh-save" onclick="UI.saveSettings()">Save Settings</button>
+    <div class="sh-note">Everything stays on your device.<br><a href="privacy.html" target="_blank">Privacy Policy →</a></div>
   </div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════
-const S = {
-  mode: 'ambient',
-  apiKey: localStorage.getItem('frida_key') || '',
-  provider: localStorage.getItem('frida_provider') || 'anthropic',
-  listening: false,
+'use strict';
+// ══════════════════════════════════════════════════════════════
+//  FRIDA_NEURO v3
+//  "One thing. Not a list."
+//  Master Alignment Build · Clean Architecture
+// ══════════════════════════════════════════════════════════════
+
+// ─── STORAGE MODULE ──────────────────────────────────────────
+const Storage = (() => {
+  const PREFIX = 'fn3_';
+  const get  = k    => { try { return JSON.parse(localStorage.getItem(PREFIX+k)); } catch{ return null; } };
+  const set  = (k,v)=> { try { localStorage.setItem(PREFIX+k, JSON.stringify(v)); } catch(e){} };
+  const del  = k    => { try { localStorage.removeItem(PREFIX+k); } catch(e){} };
+  const list = ()   => Object.keys(localStorage).filter(k=>k.startsWith(PREFIX)).map(k=>k.slice(PREFIX.length));
+  return { get, set, del, list };
+})();
+
+// ─── SECURITY MODULE ─────────────────────────────────────────
+const Security = (() => {
+
+  // Sanitize user input — prevent prompt injection, XSS, HTML injection
+  function sanitize(input) {
+    if (typeof input !== 'string') return '';
+    return input
+      .replace(/</g,  '&lt;')
+      .replace(/>/g,  '&gt;')
+      .replace(/&(?!amp;|lt;|gt;|quot;|apos;)/g, '&amp;')
+      .replace(/\x00/g, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
+      .trim()
+      .substring(0, 2000); // hard cap
+  }
+
+  // Redact sensitive PII before API transmission
+  function redact(text) {
+    if (!State.privacy) return text;
+    return text
+      .replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g,                  '[PHONE]')
+      .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[EMAIL]')
+      .replace(/\b\d{1,5}\s+\w+\s+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Court|Street|Avenue|Boulevard|Drive|Road|Lane)\b/gi, '[ADDRESS]')
+      .replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[SSN]');
+  }
+
+  // Rate limiting — prevent runaway API calls
+  const rateLimiter = { calls: [], max: 20, window: 60000 };
+  function checkRate() {
+    const now = Date.now();
+    rateLimiter.calls = rateLimiter.calls.filter(t => now - t < rateLimiter.window);
+    if (rateLimiter.calls.length >= rateLimiter.max) return false;
+    rateLimiter.calls.push(now);
+    return true;
+  }
+
+  function togglePrivacy() {
+    State.privacy = !State.privacy;
+    Storage.set('privacy', State.privacy);
+    if (State.privacy) {
+      // Fix 7: Privacy Mode hardening — stop everything outbound
+      Voice.stopListen();
+      if (Voice._inputRec) { try{Voice._inputRec.stop();}catch(e){} }
+      window.speechSynthesis?.cancel();
+      Orb.setState('idle');
+      document.getElementById('orb-status').textContent = 'privacy mode';
+      document.getElementById('btn-mic').disabled = true;
+      document.getElementById('btn-send').disabled = true;
+      document.getElementById('txt-in').placeholder = 'Privacy mode — mic and AI disabled';
+    } else {
+      document.getElementById('btn-mic').disabled = false;
+      document.getElementById('btn-send').disabled = false;
+      document.getElementById('txt-in').placeholder = 'Say something to Frida...';
+      document.getElementById('orb-status').textContent = 'tap to speak';
+    }
+    // Fix 1d: Update both badge IDs
+    document.getElementById('privacy-badge-top').classList.toggle('on', State.privacy);
+    document.getElementById('privacy-badge-main').classList.toggle('on', State.privacy);
+    document.getElementById('sh-privacy-t').classList.toggle('on', State.privacy);
+  }
+
+  return { sanitize, redact, checkRate, togglePrivacy };
+})();
+
+// ─── PROVIDERS MODULE ────────────────────────────────────────
+const Providers = {
+  groq:      { name:'Groq',    model:'llama-3.3-70b-versatile', validate: k=>k.startsWith('gsk_'),      ph:'gsk_...' },
+  anthropic: { name:'Claude',  model:'claude-sonnet-4-20250514', validate: k=>k.startsWith('sk-ant-'),  ph:'sk-ant-...' },
+  gemini:    { name:'Gemini',  model:'gemini-1.5-flash',          validate: k=>k.startsWith('AIza')||k.length>20, ph:'AIza...' },
+  openai:    { name:'GPT-4o',  model:'gpt-4o-mini',              validate: k=>k.startsWith('sk-'),      ph:'sk-proj-...' },
+};
+
+// ─── STATE (single source of truth) ─────────────────────────
+const State = {
+  // System mode — NeuroForge engine controls this
+  mode:    'normal',   // normal | overload | recovery
+  subMode: 'ambient',  // ambient | regulate | bio
+
+  // AI
+  provider:    Storage.get('provider')    || 'groq',
+  apiKey:      Storage.get('key')         || '',
+  voiceEngine: Storage.get('voice')       || 'browser',
+  ttsKey:      Storage.get('tts_key')     || '',
+
+  // Privacy & security
+  privacy:     Storage.get('privacy')     || false,
+  bioEnabled:  Storage.get('bio_enabled') !== false,
+  pinEnabled:  Storage.get('pin_enabled') || false,
+  pin:         Storage.get('pin')         || null,
+
+  // Conversation
+  conversation: [],
+
+  // Local data
+  tasks:       Storage.get('tasks')       || [],
+  commitments: Storage.get('commits')     || [],
+  memories:    Storage.get('memories')    || [], // daily memory snapshots
+
+  // Listening
+  listening:   false,
   voiceActive: false,
   recognition: null,
-  conversation: [],
-  tasks: JSON.parse(localStorage.getItem('frida_tasks') || '[]'),
-  commitments: JSON.parse(localStorage.getItem('frida_commits') || '[]'),
-  bio: {
-    hr: null, hrv: null, spo2: null, stress: null,
-    hrHistory: [],
-    alertFired: false,
-    demoInterval: null,
-    bleDevice: null,
-    bleChar: null,
-  },
-  thresholds: JSON.parse(localStorage.getItem('frida_thresh') || '{"hr":100,"stress":65,"hrv":20}'),
 };
 
-const MODE_RGB = {
-  ambient:  [59,126,248],
-  regulate: [46,196,169],
-  calm:     [155,116,240],
-  launch:   [248,124,59],
-  bio:      [248,75,122],
-};
+// ─── FRIDA SYSTEM PROMPT ─────────────────────────────────────
+const FRIDA_SYSTEM = `You are Frida — the emotional presence layer of Frida_Neuro, a cognitive stabilization system for Jeff, who has ADHD.
 
-const FRIDA_SYSTEM = `You are Frida — a calm, deeply intelligent personal AI for Jeff, who has ADHD. You are his executive function support, Chief of Staff, and calm voice in the storm.
+Core product promise: "One thing. Not a list."
 
-Core traits:
-- Warm but efficient — no wasted words, never cold
-- Deep understanding of ADHD: time blindness, task paralysis, emotional dysregulation, rejection sensitivity
-- NEVER lecture, shame, or overwhelm — one thing at a time, always
-- You catch commitments from conversation and tag them with [[COMMITMENT: description | time | priority: high/medium/low]]
-- In calm mode: grounding presence, de-escalate gently, no task lists
-- In regulate mode: surface most important thing, ruthlessly prioritize, break paralysis
-- In launch mode: ONE single smallest physical next action — never a list
-- In ambient mode: note commitments, times, names
-- In bio mode: interpret biometric readings with ADHD-specific insight (stress + ADHD dysregulation connection, HRV and emotional regulation, etc.)
+Personality: Warm, brilliant, grounded. Like a close friend who happens to be exceptionally capable. Never clinical. Never robotic. Never overwhelming.
 
-Bio context: Jeff has ADHD. Elevated HR + low HRV often signals nervous system dysregulation, not just physical exertion. Frame biometric insights through this lens.
+Modes:
+- AMBIENT: Passive listening. Catch commitments, times, names. Tag: [[COMMITMENT: text | time | priority: high/medium/low]]. Respond only if meaningful.
+- REGULATE: Surface what matters MOST. One priority. Be warm and decisive.
+- STILL WATER (overload): PURE grounding. Zero tasks. Zero lists. One sentence only. Breathe.
+- RECOVERY: ONE single physical next action. Not a plan. One sentence. Certain and calm.
+- BIO: Interpret readings through ADHD dysregulation lens. Never diagnose. Suggest grounding, hydration, rest. Always uncertainty-aware.
+- SUMMARY: Brief daily synthesis. Commitments kept, pending, and one focus for now.
+- RECALL: Help Jeff remember what he committed to. Warm and organized.
 
-Keep responses SHORT on mobile. 2-4 sentences max unless asked for more.`;
+Rules:
+- Max 2-3 sentences on mobile. Less in overload. Signal not noise.
+- NEVER say "you are safe", "this is definitely anxiety", "you are fine." Always uncertainty-aware.
+- Biometric concern → suggest hydration, rest, seated position; if recurring → gently suggest professional check.
+- Sanitize: never repeat user input verbatim in ways that could cause issues.`;
 
-// ═══════════════════════════════════════════
-// CLOCK
-// ═══════════════════════════════════════════
-function tick() {
-  const n = new Date();
-  document.getElementById('sbt').textContent =
-    `${n.getHours().toString().padStart(2,'0')}:${n.getMinutes().toString().padStart(2,'0')}`;
-  const g = ['Good night','Good night','Good night','Good night','Good night','Good morning','Good morning','Good morning','Good morning','Good morning','Good morning','Good morning','Good afternoon','Good afternoon','Good afternoon','Good afternoon','Good afternoon','Good evening','Good evening','Good evening','Good evening','Good night','Good night','Good night'];
-  document.getElementById('reg-greet').textContent = `${g[n.getHours()]}, Jeff`;
-  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('reg-snap').textContent = `${days[n.getDay()]}, ${months[n.getMonth()]} ${n.getDate()} · Your commitments`;
-}
-setInterval(tick, 1000); tick();
-
-// ═══════════════════════════════════════════
-// MODE
-// ═══════════════════════════════════════════
-function setMode(m) {
-  S.mode = m;
-  document.querySelectorAll('.mpill').forEach(p => p.classList.toggle('active', p.dataset.m === m));
-  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `p-${m}`));
-
-  const [r,g,b] = MODE_RGB[m];
-  document.getElementById('o1').style.background = `radial-gradient(circle,rgba(${r},${g},${b},.5),transparent)`;
-  document.getElementById('o2').style.background = `radial-gradient(circle,rgba(${Math.round(r*.5)},${Math.round(g*.3)},${b},.4),transparent)`;
-
-  const subs = { ambient:'Listening for what matters', regulate:'Keeping you on track', calm:'Here when it feels like too much', launch:'Breaking through the freeze', bio:'Your nervous system, visible' };
-  document.getElementById('hdr-sub').textContent = subs[m];
-
-  const sb = document.getElementById('send-btn');
-  sb.style.background = `linear-gradient(135deg,rgba(${r},${g},${b},.8),rgba(${r},${g},${b},.4))`;
-  sb.style.borderColor = `rgba(${r},${g},${b},.5)`;
-  sb.style.boxShadow = `0 4px 14px rgba(${r},${g},${b},.22)`;
-
-  const ph = { ambient:"Tell Frida anything you want to remember...", regulate:"What's on your plate today?", calm:"What's going on right now?", launch:"What are you trying to get done?", bio:"Ask Frida about your biometrics..." };
-  document.getElementById('txt-in').placeholder = ph[m];
-
-  document.getElementById('avatar').classList.toggle('pulse', m === 'ambient' && S.listening);
-}
-
-// ═══════════════════════════════════════════
-// LISTEN
-// ═══════════════════════════════════════════
-function toggleListen() {
-  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-    fridaSay("Your browser doesn't support voice. Try Chrome on Android."); return;
-  }
-  S.listening ? stopListen() : startListen();
-}
-
-function startListen() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  S.recognition = new SR();
-  S.recognition.continuous = true; S.recognition.interimResults = true; S.recognition.lang = 'en-US';
-  S.recognition.onstart = () => {
-    S.listening = true;
-    document.getElementById('mic-orb').classList.add('on');
-    document.getElementById('mic-orb').textContent = '🔴';
-    document.getElementById('ls-stat').textContent = 'Listening...';
-    document.getElementById('ls-hint').textContent = 'Speak naturally — Frida is catching everything';
-    document.getElementById('avatar').classList.add('pulse');
-  };
-  let final = '';
-  S.recognition.onresult = e => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      e.results[i].isFinal ? (final += e.results[i][0].transcript + ' ') : (interim = e.results[i][0].transcript);
-    }
-    document.getElementById('ls-stat').textContent = interim || 'Listening...';
-    if (final.length > 20) { processAmbient(final.trim()); final = ''; }
-  };
-  S.recognition.onerror = stopListen;
-  S.recognition.onend = () => { if (S.listening) S.recognition.start(); };
-  S.recognition.start();
-}
-
-function stopListen() {
-  S.listening = false;
-  if (S.recognition) S.recognition.stop();
-  document.getElementById('mic-orb').classList.remove('on');
-  document.getElementById('mic-orb').textContent = '🎙️';
-  document.getElementById('ls-stat').textContent = 'Tap to start listening';
-  document.getElementById('ls-hint').textContent = 'Frida catches commitments, names & times';
-  document.getElementById('avatar').classList.remove('pulse');
-}
-
-async function processAmbient(text) {
-  if (!S.apiKey) return;
-  const r = await callFrida(`Passively heard: "${text}"\nBriefly (1-2 sentences) acknowledge if relevant, extract any commitments. If nothing notable, just say "Got it."`, false);
-  if (r) { const c = parseCommits(r); if (c && c.length > 4) addTBubble(text, c); }
-}
-
-function addTBubble(heard, note) {
-  const feed = document.getElementById('tfeed');
-  const now = new Date();
-  const t = `${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
-  const isC = note.toLowerCase().includes('commit') || note.toLowerCase().includes('logged');
-  const el = document.createElement('div');
-  el.className = `tbub${isC?' commit':''}`;
-  el.innerHTML = `<div class="tm"><span>${isC?'⚡ COMMITMENT CAUGHT':'👂 HEARD'}</span><span>${t}</span></div><strong style="font-size:12px;opacity:.6">"${heard.substring(0,80)}${heard.length>80?'...':''}"</strong><br><span style="font-size:13px;display:block;margin-top:4px">${note}</span>`;
-  feed.insertBefore(el, feed.firstChild);
-}
-
-// ═══════════════════════════════════════════
-// VOICE INPUT
-// ═══════════════════════════════════════════
-function toggleVoice() {
-  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-    document.getElementById('txt-in').focus(); return;
-  }
-  if (S.voiceActive) {
-    if (S.recognition) S.recognition.stop();
-    S.voiceActive = false;
-    document.getElementById('mic-btn').classList.remove('rec');
-    document.getElementById('mic-btn').textContent = '🎙️';
-    return;
-  }
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new SR(); rec.continuous = false; rec.interimResults = true; rec.lang = 'en-US';
-  S.voiceActive = true;
-  document.getElementById('mic-btn').classList.add('rec');
-  document.getElementById('mic-btn').textContent = '⏹️';
-  rec.onresult = e => { let t=''; for (let i=0;i<e.results.length;i++) t+=e.results[i][0].transcript; document.getElementById('txt-in').value = t; };
-  rec.onend = () => {
-    S.voiceActive = false;
-    document.getElementById('mic-btn').classList.remove('rec');
-    document.getElementById('mic-btn').textContent = '🎙️';
-    if (document.getElementById('txt-in').value.trim()) sendMsg();
-  };
-  rec.onerror = () => { S.voiceActive = false; document.getElementById('mic-btn').classList.remove('rec'); document.getElementById('mic-btn').textContent = '🎙️'; };
-  rec.start(); S.recognition = rec;
-}
-
-// ═══════════════════════════════════════════
-// SEND MESSAGE
-// ═══════════════════════════════════════════
-async function sendMsg() {
-  const inp = document.getElementById('txt-in');
-  const text = inp.value.trim(); if (!text) return;
-  if (!S.apiKey) { openKeyModal(); return; }
-  inp.value = '';
-
-  let ctx = '';
-  if (S.mode === 'regulate') {
-    const tl = S.tasks.map(t=>`- ${t.text}${t.done?' (done)':''}`).join('\n') || 'none';
-    ctx = `Mode: REGULATE. Task list:\n${tl}\n\n`;
-  } else if (S.mode === 'calm') {
-    ctx = 'Mode: CALM. Be grounding, short, warm, no task lists. ';
-  } else if (S.mode === 'launch') {
-    ctx = 'Mode: LAUNCH. Task paralysis. Give ONE single smallest physical next action only. Be decisive. ';
-  } else if (S.mode === 'bio') {
-    const b = S.bio;
-    ctx = `Mode: BIO. Current readings — HR: ${b.hr??'unknown'} BPM, HRV: ${b.hrv??'unknown'} ms, SpO2: ${b.spo2??'unknown'}%, Stress: ${b.stress??'unknown'}/100. Interpret through ADHD dysregulation lens. `;
-  }
-
-  showThinking();
-  const r = await callFrida(ctx + text, true);
-  if (!r) return;
-  const clean = parseCommits(r);
-  fridaSay(clean);
-
-  if (S.mode === 'launch') document.getElementById('one-txt').textContent = clean.split(/[.!?]/)[0].trim() || clean;
-  else if (S.mode === 'calm') { addCalmBubble(text, clean); }
-  else if (S.mode === 'regulate' && /add|remind|forget/i.test(text)) addTask(text.replace(/^(add|remind me to|don't forget to?)\s*/i,''));
-
-  speak(clean);
-}
-
-// ═══════════════════════════════════════════
-// MULTI-PROVIDER AI ROUTER
-// ═══════════════════════════════════════════
-const PROVIDERS = {
-  anthropic: {
-    name: 'Claude', model: 'claude-sonnet-4-20250514',
-    hint: 'Anthropic key starts with sk-ant- · Get one at console.anthropic.com',
-    link: 'console.anthropic.com',
-    placeholder: 'sk-ant-api03-...',
-    validate: k => k.startsWith('sk-ant-'),
-  },
-  gemini: {
-    name: 'Gemini', model: 'gemini-1.5-flash',
-    hint: 'Free tier available · Get key at aistudio.google.com · Starts with AIza',
-    link: 'aistudio.google.com',
-    placeholder: 'AIzaSy...',
-    validate: k => k.startsWith('AIza') || k.length > 20,
-  },
-  groq: {
-    name: 'Groq', model: 'llama-3.3-70b-versatile',
-    hint: 'Free tier — very fast · Get key at console.groq.com · Starts with gsk_',
-    link: 'console.groq.com',
-    placeholder: 'gsk_...',
-    validate: k => k.startsWith('gsk_') || k.length > 20,
-  },
-  openai: {
-    name: 'GPT-4o', model: 'gpt-4o-mini',
-    hint: 'Pay per use · Get key at platform.openai.com · Starts with sk-',
-    link: 'platform.openai.com',
-    placeholder: 'sk-proj-...',
-    validate: k => k.startsWith('sk-') || k.length > 20,
-  },
-};
-
-async function callFrida(userText, history) {
-  if (history) S.conversation.push({ role:'user', content:userText });
-  const msgs = history ? S.conversation.slice(-12) : [{ role:'user', content:userText }];
-  const prov = PROVIDERS[S.provider];
-
-  try {
-    let reply = '';
-
-    if (S.provider === 'anthropic') {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'x-api-key':S.apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-        body: JSON.stringify({ model: prov.model, max_tokens:500, system:FRIDA_SYSTEM, messages:msgs })
-      });
-      if (!res.ok) { const e=await res.json(); fridaSay(`Claude error: ${e.error?.message||res.status}`); return null; }
-      const d = await res.json();
-      reply = d.content?.[0]?.text || '';
-
-    } else if (S.provider === 'gemini') {
-      const geminiMsgs = msgs.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts:[{text: m.content}] }));
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${prov.model}:generateContent?key=${S.apiKey}`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ system_instruction:{parts:[{text:FRIDA_SYSTEM}]}, contents: geminiMsgs, generationConfig:{maxOutputTokens:500} })
-      });
-      if (!res.ok) { const e=await res.json(); fridaSay(`Gemini error: ${e.error?.message||res.status}`); return null; }
-      const d = await res.json();
-      reply = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    } else if (S.provider === 'groq') {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.apiKey}`},
-        body: JSON.stringify({ model: prov.model, max_tokens:500, messages:[{role:'system',content:FRIDA_SYSTEM},...msgs] })
-      });
-      if (!res.ok) { const e=await res.json(); fridaSay(`Groq error: ${e.error?.message||res.status}`); return null; }
-      const d = await res.json();
-      reply = d.choices?.[0]?.message?.content || '';
-
-    } else if (S.provider === 'openai') {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.apiKey}`},
-        body: JSON.stringify({ model: prov.model, max_tokens:500, messages:[{role:'system',content:FRIDA_SYSTEM},...msgs] })
-      });
-      if (!res.ok) { const e=await res.json(); fridaSay(`OpenAI error: ${e.error?.message||res.status}`); return null; }
-      const d = await res.json();
-      reply = d.choices?.[0]?.message?.content || '';
+// ─── AI MODULE ───────────────────────────────────────────────
+const AI = {
+  async call(userText, addHistory = true) {
+    if (!State.apiKey || State.privacy) return null;
+    if (!Security.checkRate()) {
+      Orb.showSpeech("I need a moment to breathe too. Try again in a minute.");
+      return null;
     }
 
-    if (history && reply) S.conversation.push({ role:'assistant', content:reply });
-    return reply || null;
+    const clean   = Security.sanitize(userText);
+    const redacted= Security.redact(clean);
 
-  } catch(e) {
-    fridaSay('Connection error. Check your network and API key.');
-    return null;
-  }
-}
+    if (addHistory) State.conversation.push({ role:'user', content:redacted });
+    const msgs = addHistory ? State.conversation.slice(-12) : [{ role:'user', content:redacted }];
 
-// ═══════════════════════════════════════════
-// COMMITMENT PARSER
-// ═══════════════════════════════════════════
-function parseCommits(text) {
-  const rx = /\[\[COMMITMENT:\s*([^|]+)\|?\s*([^|]*)\|?\s*priority:\s*(high|medium|low)\s*\]\]/gi;
-  let clean = text, m;
-  while ((m = rx.exec(text)) !== null) {
-    const t = { id:Date.now()+Math.random(), text:m[1].trim(), time:m[2].trim()||null, priority:m[3], done:false };
-    S.tasks.unshift(t); S.commitments.unshift(t);
-    clean = clean.replace(m[0],'').trim();
-  }
-  if (S.tasks.length) { localStorage.setItem('frida_tasks',JSON.stringify(S.tasks)); localStorage.setItem('frida_commits',JSON.stringify(S.commitments)); renderTasks(); updateNext(); }
-  return clean;
-}
+    const p = Providers[State.provider];
 
-// ═══════════════════════════════════════════
-// TASKS
-// ═══════════════════════════════════════════
-function addTask(text) {
-  const t = { id:Date.now(), text:text.trim(), done:false, priority:'medium', time:null };
-  S.tasks.unshift(t); localStorage.setItem('frida_tasks',JSON.stringify(S.tasks)); renderTasks(); updateNext();
-}
-function toggleTask(id) {
-  const t = S.tasks.find(t=>t.id===id); if (t) { t.done=!t.done; localStorage.setItem('frida_tasks',JSON.stringify(S.tasks)); renderTasks(); updateNext(); }
-}
-function renderTasks() {
-  const el = document.getElementById('task-list');
-  const show = S.tasks.slice(0,8);
-  if (!show.length) { el.innerHTML='<div style="font-size:13px;color:var(--text-3);padding:8px 0">No tasks yet. Tell Frida what\'s on your plate.</div>'; return; }
-  el.innerHTML = show.map(t=>`<div class="task ${t.done?'done':''}" onclick="toggleTask(${t.id})"><div class="tck"></div><div class="ttxt">${esc(t.text)}</div><div class="ttime">${t.time||''}</div></div>`).join('');
-}
-function updateNext() {
-  const n = S.tasks.find(t=>!t.done&&t.priority==='high') || S.tasks.find(t=>!t.done);
-  if (n) { document.getElementById('nc-title').textContent = n.text; document.getElementById('nc-time').textContent = n.time||'When you\'re ready'; }
-}
+    try {
+      let reply = '';
 
-// ═══════════════════════════════════════════
-// UI HELPERS
-// ═══════════════════════════════════════════
-function showThinking() {
-  const el = document.getElementById('frida-resp'); el.classList.add('show');
-  document.getElementById('fr-txt').innerHTML = '<div class="fr-lbl">Frida</div><div class="dots"><span></span><span></span><span></span></div>';
-  el.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-function fridaSay(text) {
-  const el = document.getElementById('frida-resp'); el.classList.add('show');
-  document.getElementById('fr-txt').innerHTML = `<div class="fr-lbl">Frida</div>${esc(text)}`;
-  el.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-function addCalmBubble(u,f) {
-  const c = document.getElementById('calm-chat');
-  const ub = document.createElement('div'); ub.className='cbub u'; ub.textContent=u; c.appendChild(ub);
-  const fb = document.createElement('div'); fb.className='cbub f'; fb.textContent=f; c.appendChild(fb);
-  fb.scrollIntoView({behavior:'smooth'});
-}
-function speak(t) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(t.substring(0,180)); u.rate=.92; u.pitch=1.05; u.volume=.85;
-  const vs = window.speechSynthesis.getVoices();
-  const v = vs.find(v=>v.name.includes('Samantha')||v.name.includes('Karen')||v.name.includes('Moira')||(v.lang==='en-US'&&v.name.includes('Google')));
-  if (v) u.voice=v;
-  window.speechSynthesis.speak(u);
-}
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// ═══════════════════════════════════════════
-// PROVIDER CHOOSER + KEY MODAL
-// ═══════════════════════════════════════════
-function selectProvider(p) {
-  S.provider = p;
-  document.querySelectorAll('.prov-card').forEach(c => c.classList.toggle('active', c.dataset.p === p));
-  const prov = PROVIDERS[p];
-  document.getElementById('prov-hint').textContent = prov.hint;
-  document.getElementById('ki').placeholder = prov.placeholder;
-  document.getElementById('prov-link-note').innerHTML = `Get your key at <strong>${prov.link}</strong>`;
-  // Pre-fill if we already have a key for this provider
-  const stored = localStorage.getItem(`frida_key_${p}`) || '';
-  document.getElementById('ki').value = stored ? '••••••••••••••••' : '';
-  document.getElementById('ki').dataset.prefilled = stored ? '1' : '';
-}
-
-function openKeyModal() {
-  document.getElementById('key-modal').classList.add('open');
-  // Restore current provider selection
-  selectProvider(S.provider);
-  setTimeout(() => document.getElementById('ki').focus(), 400);
-}
-
-function saveKey() {
-  const inp = document.getElementById('ki');
-  // If field shows bullets and user didn't change it, keep existing key
-  let k = inp.dataset.prefilled === '1' && inp.value === '••••••••••••••••'
-    ? localStorage.getItem(`frida_key_${S.provider}`) || ''
-    : inp.value.trim();
-
-  const prov = PROVIDERS[S.provider];
-  if (!k || !prov.validate(k)) {
-    inp.style.borderColor = 'rgba(248,100,100,.6)';
-    document.getElementById('prov-hint').textContent = `⚠️ That doesn't look right for a ${prov.name} key. ${prov.hint}`;
-    return;
-  }
-
-  S.apiKey = k;
-  localStorage.setItem('frida_key', k);
-  localStorage.setItem(`frida_key_${S.provider}`, k);
-  localStorage.setItem('frida_provider', S.provider);
-
-  const provLabel = `${prov.name} ✓`;
-  document.getElementById('key-btn').textContent = provLabel;
-  document.getElementById('key-btn').style.color = '#2ec4a9';
-  document.getElementById('key-modal').classList.remove('open');
-
-  setTimeout(() => {
-    callFrida(`Jeff just opened Frida. Greet him warmly in 2 sentences. It's ${new Date().getHours()<12?'morning':new Date().getHours()<17?'afternoon':'evening'}.`, true)
-      .then(r => { if(r) { fridaSay(parseCommits(r)); speak(r); }});
-  }, 500);
-}
-
-document.getElementById('key-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('key-modal')) document.getElementById('key-modal').classList.remove('open');
-});
-
-// ═══════════════════════════════════════════
-// FDP — FRIDA DEVICE PROTOCOL v1.1
-// ═══════════════════════════════════════════
-window.FDP = {
-  ingest(payload) {
-    // payload: { device, metric, value, timestamp?, hrv?, spo2? }
-    const ts = new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    fdpLog(`[${ts}] ${payload.device} · ${payload.metric}: ${payload.value}`, payload.metric);
-
-    if (payload.metric === 'hr' || payload.metric === 'heart_rate') {
-      updateBioHR(Number(payload.value));
-    }
-    if (payload.metric === 'hrv') updateBioHRV(Number(payload.value));
-    if (payload.metric === 'spo2') updateBioSPO2(Number(payload.value));
-    if (payload.metric === 'stress') updateBioStress(Number(payload.value));
-
-    // Full packet with multiple metrics
-    if (payload.hr)     updateBioHR(Number(payload.hr));
-    if (payload.hrv)    updateBioHRV(Number(payload.hrv));
-    if (payload.spo2)   updateBioSPO2(Number(payload.spo2));
-    if (payload.stress) updateBioStress(Number(payload.stress));
-  }
-};
-
-function fdpLog(msg, type='sys') {
-  const log = document.getElementById('fdp-log');
-  const el = document.createElement('div'); el.className=`fdp-entry ${type}`; el.textContent=msg;
-  log.insertBefore(el, log.firstChild);
-  while (log.children.length > 30) log.removeChild(log.lastChild);
-}
-
-// ═══════════════════════════════════════════
-// BIO DATA UPDATERS
-// ═══════════════════════════════════════════
-function updateBioHR(val) {
-  S.bio.hr = val;
-  S.bio.hrHistory.push({ t: Date.now(), v: val });
-  if (S.bio.hrHistory.length > 60) S.bio.hrHistory.shift();
-
-  const el = document.getElementById('vc-hr');
-  document.getElementById('vv-hr').textContent = val;
-  document.getElementById('sb-hr-badge').textContent = `♥ ${val}`;
-  document.getElementById('sb-hr-badge').style.display = 'block';
-  document.getElementById('hr-last-update').textContent = `Updated ${new Date().toLocaleTimeString()}`;
-
-  const prev = S.bio.hrHistory.length > 1 ? S.bio.hrHistory[S.bio.hrHistory.length-2].v : val;
-  const diff = val - prev;
-  const trend = document.getElementById('vt-hr');
-
-  el.className = 'vital-card';
-  if (val >= S.thresholds.hr) {
-    el.classList.add('alert');
-    trend.className = 'vc-trend up'; trend.textContent = `↑ ${val >= S.thresholds.hr ? 'Above threshold' : 'Elevated'}`;
-    triggerStressAlert(val);
-  } else if (val < 60) {
-    el.classList.add('warn');
-    trend.className = 'vc-trend stable'; trend.textContent = '↓ Resting';
-  } else {
-    el.classList.add('good');
-    trend.className = 'vc-trend stable'; trend.textContent = diff > 0 ? `↑ ${diff} from last` : diff < 0 ? `↓ ${Math.abs(diff)} from last` : '→ Stable';
-  }
-
-  computeStress();
-  drawHRChart();
-}
-
-function updateBioHRV(val) {
-  S.bio.hrv = val;
-  document.getElementById('vv-hrv').textContent = val;
-  const el = document.getElementById('vc-hrv');
-  const trend = document.getElementById('vt-hrv');
-  el.className = 'vital-card';
-  if (val < S.thresholds.hrv) { el.classList.add('alert'); trend.className='vc-trend up'; trend.textContent='↓ Low — stress likely'; }
-  else if (val < 40) { el.classList.add('warn'); trend.className='vc-trend stable'; trend.textContent='→ Moderate'; }
-  else { el.classList.add('good'); trend.className='vc-trend down'; trend.textContent='↑ Healthy range'; }
-  computeStress();
-}
-
-function updateBioSPO2(val) {
-  S.bio.spo2 = val;
-  document.getElementById('vv-spo2').textContent = val;
-  const el = document.getElementById('vc-spo2');
-  const trend = document.getElementById('vt-spo2');
-  el.className = 'vital-card';
-  if (val < 94) { el.classList.add('alert'); trend.className='vc-trend up'; trend.textContent='↓ Low — breathe deeply'; }
-  else if (val < 97) { el.classList.add('warn'); trend.className='vc-trend stable'; trend.textContent='→ Slightly low'; }
-  else { el.classList.add('good'); trend.className='vc-trend down'; trend.textContent='✓ Normal'; }
-}
-
-function updateBioStress(val) {
-  S.bio.stress = val;
-  updateStressRing(val);
-  if (val >= S.thresholds.stress && !S.bio.alertFired) triggerStressAlert(null, val);
-}
-
-function computeStress() {
-  // Derive stress score from HR + HRV
-  let score = 0; let factors = 0;
-  if (S.bio.hr !== null) {
-    const hrScore = Math.min(100, Math.max(0, ((S.bio.hr - 60) / (S.thresholds.hr - 60)) * 80));
-    score += hrScore; factors++;
-  }
-  if (S.bio.hrv !== null) {
-    const hrvScore = Math.min(100, Math.max(0, (1 - (S.bio.hrv / 60)) * 100));
-    score += hrvScore; factors++;
-  }
-  if (factors > 0) {
-    S.bio.stress = Math.round(score / factors);
-    updateStressRing(S.bio.stress);
-    document.getElementById('vv-stress').textContent = S.bio.stress;
-    const el = document.getElementById('vc-stress');
-    const trend = document.getElementById('vt-stress');
-    el.className = 'vital-card';
-    if (S.bio.stress >= S.thresholds.stress) { el.classList.add('alert'); trend.className='vc-trend up'; trend.textContent='↑ Elevated'; }
-    else if (S.bio.stress >= 40) { el.classList.add('warn'); trend.className='vc-trend stable'; trend.textContent='→ Moderate'; }
-    else { el.classList.add('good'); trend.className='vc-trend down'; trend.textContent='✓ Regulated'; }
-  }
-}
-
-function updateStressRing(val) {
-  const ring = document.getElementById('stress-ring');
-  const circ = 2 * Math.PI * 60; // 377
-  const offset = circ - (val / 100) * circ;
-  ring.style.strokeDashoffset = offset;
-  document.getElementById('ring-val').textContent = val;
-
-  let color, state, desc;
-  if (val >= S.thresholds.stress) {
-    color = '#f84b7a'; state = '⚠️ Elevated Stress'; desc = 'Your nervous system is dysregulated. This is ADHD-common — you\'re not broken. Let Frida help you slow down.';
-  } else if (val >= 40) {
-    color = '#f87c3b'; state = '〰️ Moderate Load'; desc = 'Some activation present. Keep an eye on it. Try the Calm mode if things escalate.';
-  } else {
-    color = '#2ec4a9'; state = '✅ Regulated'; desc = 'Your nervous system looks good. Good window for focused work.';
-  }
-  ring.style.stroke = color;
-  document.getElementById('stress-state').textContent = state;
-  document.getElementById('stress-desc').textContent = desc;
-}
-
-// ═══════════════════════════════════════════
-// STRESS ALERT
-// ═══════════════════════════════════════════
-function triggerStressAlert(hr, stress) {
-  if (S.bio.alertFired) return;
-  S.bio.alertFired = true;
-  const banner = document.getElementById('stress-alert');
-  const sub = hr ? `HR at ${hr} BPM — above your ${S.thresholds.hr} BPM threshold.` : `Stress score ${stress}/100 — above your ${S.thresholds.stress} threshold.`;
-  document.getElementById('sa-sub').textContent = sub;
-  banner.classList.add('show');
-  // Auto-dismiss after 8s if not acted on
-  setTimeout(() => { banner.classList.remove('show'); setTimeout(()=>S.bio.alertFired=false, 30000); }, 8000);
-}
-
-function handleStressAlert() {
-  document.getElementById('stress-alert').classList.remove('show');
-  setMode('calm');
-  if (S.apiKey) {
-    const hr = S.bio.hr; const st = S.bio.stress;
-    callFrida(`Jeff's biometrics just triggered a stress alert. HR: ${hr||'unknown'} BPM, Stress score: ${st||'unknown'}/100. He just switched to Calm mode. Give him one short, grounding sentence.`, true)
-      .then(r => { if(r) { fridaSay(parseCommits(r)); speak(r); }});
-  }
-}
-
-// ═══════════════════════════════════════════
-// HR SPARKLINE CHART
-// ═══════════════════════════════════════════
-function drawHRChart() {
-  const canvas = document.getElementById('hr-canvas');
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.parentElement.offsetWidth; const h = 80;
-  canvas.width = w * dpr; canvas.height = h * dpr;
-  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-
-  const data = S.bio.hrHistory.slice(-40);
-  if (data.length < 2) return;
-
-  const vals = data.map(d=>d.v);
-  const min = Math.max(40, Math.min(...vals) - 5);
-  const max = Math.min(180, Math.max(...vals) + 5);
-  const pad = 6;
-  const chartW = w - pad*2; const chartH = h - pad*2;
-
-  const toX = i => pad + (i / (data.length-1)) * chartW;
-  const toY = v => pad + (1 - (v-min)/(max-min)) * chartH;
-
-  // Threshold line
-  ctx.beginPath();
-  ctx.setLineDash([4,4]);
-  ctx.strokeStyle = 'rgba(248,75,122,.35)';
-  ctx.lineWidth = 1;
-  const ty = toY(S.thresholds.hr);
-  if (ty >= pad && ty <= h-pad) { ctx.moveTo(pad, ty); ctx.lineTo(w-pad, ty); ctx.stroke(); }
-  ctx.setLineDash([]);
-
-  // Fill gradient
-  const grad = ctx.createLinearGradient(0,0,0,h);
-  grad.addColorStop(0,'rgba(248,75,122,.25)');
-  grad.addColorStop(1,'rgba(248,75,122,0)');
-  ctx.beginPath();
-  ctx.moveTo(toX(0), h);
-  data.forEach((d,i) => i===0 ? ctx.lineTo(toX(i), toY(d.v)) : ctx.lineTo(toX(i), toY(d.v)));
-  ctx.lineTo(toX(data.length-1), h);
-  ctx.closePath();
-  ctx.fillStyle = grad; ctx.fill();
-
-  // Line
-  ctx.beginPath();
-  data.forEach((d,i) => i===0 ? ctx.moveTo(toX(i), toY(d.v)) : ctx.lineTo(toX(i), toY(d.v)));
-  ctx.strokeStyle = '#f84b7a'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
-
-  // Current dot
-  const last = data[data.length-1];
-  ctx.beginPath();
-  ctx.arc(toX(data.length-1), toY(last.v), 4, 0, Math.PI*2);
-  ctx.fillStyle = '#f84b7a'; ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth=1.5; ctx.stroke();
-}
-
-// ═══════════════════════════════════════════
-// THRESHOLDS
-// ═══════════════════════════════════════════
-function adjThresh(key, delta) {
-  S.thresholds[key] = Math.max(10, S.thresholds[key] + delta);
-  document.getElementById(`thr-${key}`).textContent = S.thresholds[key];
-  if (key === 'hr') document.getElementById('thresh-display').textContent = S.thresholds.hr;
-  localStorage.setItem('frida_thresh', JSON.stringify(S.thresholds));
-  S.bio.alertFired = false; // reset alert when threshold changes
-}
-
-// ═══════════════════════════════════════════
-// DEMO MODE
-// ═══════════════════════════════════════════
-function injectDemo() {
-  const btn = document.getElementById('demo-status');
-  if (S.bio.demoInterval) {
-    clearInterval(S.bio.demoInterval); S.bio.demoInterval = null;
-    btn.textContent = 'Start'; btn.style.background='rgba(59,126,248,.15)'; btn.style.color='#3b7ef8';
-    fdpLog('[DEMO] Stream stopped', 'sys'); return;
-  }
-  btn.textContent = 'Stop'; btn.style.background='rgba(248,75,122,.2)'; btn.style.color='#f84b7a';
-  fdpLog('[DEMO] Simulated stream started — Apple Watch · Galaxy Watch', 'ble');
-  setMode('bio');
-
-  let baseHR = 72; let baseHRV = 38; let trend = 0;
-  S.bio.demoInterval = setInterval(() => {
-    trend += (Math.random() - 0.48) * 3;
-    trend = Math.max(-15, Math.min(25, trend));
-    const hr  = Math.round(Math.max(50, Math.min(140, baseHR + trend + (Math.random()-0.5)*4)));
-    const hrv = Math.round(Math.max(8,  Math.min(80,  baseHRV - trend*0.4 + (Math.random()-0.5)*3)));
-    const spo2= Math.round(Math.max(94, Math.min(100, 98 + (Math.random()-0.5))));
-    window.FDP.ingest({ device: Math.random()>0.5?'apple_watch':'galaxy_watch', metric:'hr', value:hr, hr, hrv, spo2 });
-  }, 2000);
-}
-
-// ═══════════════════════════════════════════
-// WEB BLUETOOTH (Samsung Galaxy Watch)
-// ═══════════════════════════════════════════
-async function connectBLE() {
-  if (!navigator.bluetooth) {
-    fdpLog('[BLE] Web Bluetooth not available in this browser. Use Chrome on Android.', 'sys');
-    fridaSay("Web Bluetooth requires Chrome on Android. Make sure it's enabled in chrome://flags."); return;
-  }
-  fdpLog('[BLE] Scanning for Heart Rate service (0x180D)...', 'ble');
-  document.getElementById('ble-status').textContent = 'Scanning...';
-  try {
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: ['heart_rate'] }],
-      optionalServices: ['battery_service', 'health_thermometer']
-    });
-    fdpLog(`[BLE] Connected: ${device.name}`, 'ble');
-    document.getElementById('ble-status').textContent = 'Connected'; document.getElementById('ble-status').className='conn-status connected';
-    document.getElementById('aw-status');
-    S.bio.bleDevice = device;
-
-    const server  = await device.gatt.connect();
-    const service = await server.getPrimaryService('heart_rate');
-    const char    = await service.getCharacteristic('heart_rate_measurement');
-    S.bio.bleChar = char;
-
-    await char.startNotifications();
-    char.addEventListener('characteristicvaluechanged', e => {
-      const val = e.target.value;
-      const flags = val.getUint8(0);
-      const hr = (flags & 0x01) ? val.getUint16(1, true) : val.getUint8(1);
-      // RR intervals for HRV (if available)
-      let hrv = null;
-      if (flags & 0x10) {
-        const rrOffset = (flags & 0x08) ? 5 : 3;
-        if (val.byteLength > rrOffset + 1) {
-          const rr = val.getUint16(rrOffset, true) / 1024 * 1000;
-          hrv = Math.round(rr * 0.4); // simplified RMSSD approximation
-        }
+      if (State.provider === 'anthropic') {
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json','x-api-key':State.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+          body: JSON.stringify({ model:p.model, max_tokens:400, system:FRIDA_SYSTEM, messages:msgs })
+        });
+        if (!r.ok) { const e=await r.json(); return this.fail(e.error?.message); }
+        const d = await r.json(); reply = d.content?.[0]?.text || '';
       }
-      window.FDP.ingest({ device: device.name || 'galaxy_watch', metric:'hr', value:hr, hr, ...(hrv?{hrv}:{}) });
+      else if (State.provider === 'groq') {
+        const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${State.apiKey}` },
+          body: JSON.stringify({ model:p.model, max_tokens:400, messages:[{role:'system',content:FRIDA_SYSTEM},...msgs] })
+        });
+        if (!r.ok) { const e=await r.json(); return this.fail(e.error?.message); }
+        const d = await r.json(); reply = d.choices?.[0]?.message?.content || '';
+      }
+      else if (State.provider === 'gemini') {
+        const gm = msgs.map(m=>({ role:m.role==='assistant'?'model':'user', parts:[{text:m.content}] }));
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${p.model}:generateContent?key=${State.apiKey}`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ system_instruction:{parts:[{text:FRIDA_SYSTEM}]}, contents:gm, generationConfig:{maxOutputTokens:400} })
+        });
+        if (!r.ok) { const e=await r.json(); return this.fail(e.error?.message); }
+        const d = await r.json(); reply = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      }
+      else if (State.provider === 'openai') {
+        const r = await fetch('https://api.openai.com/v1/chat/completions', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${State.apiKey}` },
+          body: JSON.stringify({ model:p.model, max_tokens:400, messages:[{role:'system',content:FRIDA_SYSTEM},...msgs] })
+        });
+        if (!r.ok) { const e=await r.json(); return this.fail(e.error?.message); }
+        const d = await r.json(); reply = d.choices?.[0]?.message?.content || '';
+      }
+
+      if (addHistory && reply) State.conversation.push({ role:'assistant', content:reply });
+      return reply || null;
+
+    } catch(e) {
+      return this.fail('Connection lost.');
+    }
+  },
+
+  fail(msg = 'Something went wrong.') {
+    // Graceful degradation — Frida calmly explains
+    const calm = "I lost connection for a moment. Check your network and try again — I'm still here.";
+    Orb.showSpeech(calm);
+    Orb.setState('idle');
+    return null;
+  },
+
+  parseCommits(text) {
+    const rx = /\[\[COMMITMENT:\s*([^|]+)\|?\s*([^|]*)\|?\s*priority:\s*(high|medium|low)\s*\]\]/gi;
+    let clean = text, m;
+    while ((m = rx.exec(text)) !== null) {
+      const t = { id:Date.now()+Math.random(), text:m[1].trim(), time:m[2].trim()||null, priority:m[3], done:false, ts:new Date().toISOString() };
+      State.tasks.unshift(t);
+      State.commitments.unshift(t);
+      clean = clean.replace(m[0],'').trim();
+      Storage.set('tasks',   State.tasks);
+      Storage.set('commits', State.commitments);
+      UI.addChip(`${t.text}${t.time ? ' · '+t.time : ''}`);
+    }
+    return clean;
+  },
+};
+
+// ─── VOICE MODULE ────────────────────────────────────────────
+const Voice = {
+  _listenRec: null,
+  _inputRec:  null,
+
+  startListen() {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+    if (State.listening || State.privacy) return;
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this._listenRec = new SR();
+    this._listenRec.continuous = true; this._listenRec.interimResults = true; this._listenRec.lang = 'en-US';
+
+    let final = '', timer = null;
+
+    this._listenRec.onstart = () => {
+      State.listening = true;
+      // Orb MUST reflect real state — listening = mic on
+      Orb.setState('listening');
+      document.getElementById('btn-mic').classList.add('rec');
+      document.getElementById('btn-mic').textContent = '⏹️';
+    };
+
+    this._listenRec.onresult = e => {
+      let interim = '';
+      for (let i=e.resultIndex; i<e.results.length; i++) {
+        e.results[i].isFinal ? (final += e.results[i][0].transcript + ' ') : (interim = e.results[i][0].transcript);
+      }
+      if (interim) document.getElementById('txt-in').placeholder = interim;
+
+      if (final.trim().split(' ').length >= 4) {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (final.trim().length > 8) { this.processAmbient(final.trim()); final = ''; }
+        }, 2500);
+      }
+    };
+
+    this._listenRec.onerror = e => { if (e.error !== 'no-speech') this.stopListen(); };
+    this._listenRec.onend = () => { if (State.listening && !State.privacy) this._listenRec.start(); };
+    this._listenRec.start();
+  },
+
+  stopListen() {
+    State.listening = false;
+    if (this._listenRec) { try { this._listenRec.stop(); } catch(e){} }
+    if (State.mode === 'normal') Orb.setState('idle');
+    document.getElementById('btn-mic').classList.remove('rec');
+    document.getElementById('btn-mic').textContent = '🎙️';
+    document.getElementById('txt-in').placeholder = 'Say something to Frida...';
+  },
+
+  async processAmbient(text) {
+    if (!State.apiKey || State.privacy) return;
+    if (text.split(' ').length < 4) return;
+    const r = await AI.call(`Passively heard: "${text}"\nIf there is a clear commitment, time, or important note: 1 sentence + tag it. Otherwise respond exactly "SKIP".`, false);
+    if (!r || r.trim() === 'SKIP') return;
+    const clean = AI.parseCommits(r);
+    if (clean && clean.length > 4) UI.addChip(clean);
+  },
+
+  toggleInput() {
+    if (State.privacy) return;
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      document.getElementById('txt-in').focus(); return;
+    }
+    if (State.voiceActive) {
+      if (this._inputRec) { try { this._inputRec.stop(); } catch(e){} }
+      State.voiceActive = false;
+      document.getElementById('btn-mic').classList.remove('rec');
+      document.getElementById('btn-mic').textContent = '🎙️';
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this._inputRec = new SR(); this._inputRec.continuous=false; this._inputRec.interimResults=true; this._inputRec.lang='en-US';
+    State.voiceActive = true;
+    document.getElementById('btn-mic').classList.add('rec');
+    document.getElementById('btn-mic').textContent = '⏹️';
+    this._inputRec.onresult = e => { let t=''; for(let i=0;i<e.results.length;i++) t+=e.results[i][0].transcript; document.getElementById('txt-in').value=t; };
+    this._inputRec.onend = () => {
+      State.voiceActive = false;
+      document.getElementById('btn-mic').classList.remove('rec');
+      document.getElementById('btn-mic').textContent = '🎙️';
+      if (document.getElementById('txt-in').value.trim()) UI.send();
+    };
+    this._inputRec.onerror = () => { State.voiceActive=false; document.getElementById('btn-mic').classList.remove('rec'); document.getElementById('btn-mic').textContent='🎙️'; };
+    this._inputRec.start();
+  },
+
+  async speak(text) {
+    if (State.privacy) return;
+    const s = text.substring(0, 280);
+    const v = State.voiceEngine;
+    const k = State.ttsKey || State.apiKey;
+
+    if (v === 'openai-tts' && k) {
+      try {
+        const r = await fetch('https://api.openai.com/v1/audio/speech', { method:'POST', headers:{'Authorization':`Bearer ${k}`,'Content-Type':'application/json'}, body:JSON.stringify({model:'tts-1',input:s,voice:'nova',speed:.93}) });
+        if (r.ok) return this._playBlob(await r.blob());
+      } catch(e){}
+    }
+    if (v === 'elevenlabs' && k) {
+      try {
+        const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream', { method:'POST', headers:{'xi-api-key':k,'Content-Type':'application/json'}, body:JSON.stringify({text:s,model_id:'eleven_turbo_v2',voice_settings:{stability:.5,similarity_boost:.8,style:.18,use_speaker_boost:true}}) });
+        if (r.ok) return this._playBlob(await r.blob());
+      } catch(e){}
+    }
+    if (v === 'groq-tts' && State.apiKey && State.provider === 'groq') {
+      try {
+        const r = await fetch('https://api.groq.com/openai/v1/audio/speech', { method:'POST', headers:{'Authorization':`Bearer ${State.apiKey}`,'Content-Type':'application/json'}, body:JSON.stringify({model:'playai-tts',input:s,voice:'Aaliyah-PlayAI'}) });
+        if (r.ok) return this._playBlob(await r.blob());
+      } catch(e){}
+    }
+    // Browser TTS
+    return new Promise(res => {
+      if (!('speechSynthesis' in window)) { res(); return; }
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(s);
+      u.rate=.88; u.pitch=1.06; u.volume=.88;
+      const vs = window.speechSynthesis.getVoices();
+      const best = vs.find(v=>v.name.includes('Samantha')||v.name.includes('Karen')||v.name.includes('Moira'))
+                || vs.find(v=>v.lang==='en-US'&&!v.name.includes('Male'))
+                || vs.find(v=>v.lang.startsWith('en'));
+      if (best) u.voice = best;
+      u.onend=res; u.onerror=res;
+      window.speechSynthesis.speak(u);
+    });
+  },
+
+  _playBlob(blob) {
+    return new Promise(res => {
+      const url=URL.createObjectURL(blob), audio=new Audio(url);
+      audio.onended=()=>{ URL.revokeObjectURL(url); res(); };
+      audio.play().catch(res);
+    });
+  },
+};
+
+// ─── BIOHOOK MODULE (v2) ──────────────────────────────────────
+const BioHook = {
+  _debounce: null,
+  _cooldown: false,
+  _fired:    false,
+
+  ingest(payload) {
+    if (!State.bioEnabled || State.privacy) return;
+    if (payload.hr  !== undefined) State.bio.hr     = Number(payload.hr);
+    if (payload.hrv !== undefined) State.bio.hrv    = Number(payload.hrv);
+    if (payload.stress !== undefined) State.bio.stress = Number(payload.stress);
+    this.evaluate();
+  },
+
+  evaluate() {
+    if (this._cooldown || this._fired || State.mode === 'overload') return;
+    const {hr,hrv,stress} = State.bio;
+    const triggered =
+      (hr   !== null && hr    > 130)   ||
+      (stress !== null && stress > 80) ||
+      (hrv  !== null && hr !== null && hrv < 30 && hr > 100);
+    if (!triggered) { clearTimeout(this._debounce); this._debounce = null; return; }
+    if (!this._debounce) {
+      this._debounce = setTimeout(() => {
+        this._debounce = null; this._fire();
+      }, 5000); // 5s debounce
+    }
+  },
+
+  _fire() {
+    this._fired = true; this._cooldown = true;
+    const {hr,hrv,stress} = State.bio;
+    let reason = hr>130 ? `HR at ${hr} BPM` : stress>80 ? `stress at ${stress}/100` : `HRV low at ${hrv}ms`;
+    document.getElementById('ba-sub').textContent = `${reason} — Still Water activating.`;
+    document.getElementById('bio-alert').classList.add('on');
+    setTimeout(() => document.getElementById('bio-alert').classList.remove('on'), 8000);
+    setTimeout(() => { this._cooldown = false; this._fired = false; }, 30000); // 30s cooldown
+  },
+
+  toggleEnabled() {
+    State.bioEnabled = !State.bioEnabled;
+    Storage.set('bio_enabled', State.bioEnabled);
+    document.getElementById('sh-bio-t').classList.toggle('on', State.bioEnabled);
+  },
+};
+
+// Attach bio state
+State.bio = { hr:null, hrv:null, stress:null };
+
+// ─── ORB MODULE (presence + particle system) ─────────────────
+const Orb = (() => {
+  const canvas = document.getElementById('orb-canvas');
+  const ctx    = canvas.getContext('2d');
+  let particles= [], animId, currentState='idle';
+
+  function resize() {
+    const s = document.getElementById('orb-wrap').offsetWidth + 100;
+    const d = window.devicePixelRatio || 1;
+    canvas.width=s*d; canvas.height=s*d;
+    canvas.style.width=s+'px'; canvas.style.height=s+'px';
+    ctx.scale(d,d);
+  }
+
+  class P {
+    constructor() { this.init(); }
+    init() {
+      const cx=(canvas.width/(window.devicePixelRatio||1))/2, cy=cx, r=115;
+      const a=Math.random()*Math.PI*2, d=r*(0.5+Math.random()*.6);
+      this.x=cx+Math.cos(a)*d; this.y=cy+Math.sin(a)*d;
+      const sp=0.1+Math.random()*.2;
+      this.vx=-Math.sin(a)*sp*(Math.random()>.5?1:-1);
+      this.vy= Math.cos(a)*sp*(Math.random()>.5?1:-1);
+      this.life=Math.random()*200; this.maxLife=130+Math.random()*170;
+      this.size=0.6+Math.random()*1.5;
+      this.os=(0.0012+Math.random()*.0028)*(Math.random()>.5?1:-1);
+      this.angle=a; this.cx=cx; this.cy=cy; this.r=r;
+      const cols=[[130,170,255],[150,120,255],[90,195,255],[185,170,255],[125,205,255]];
+      this.col=cols[Math.floor(Math.random()*cols.length)];
+    }
+    update(st) {
+      this.life++;
+      const sp=st==='listening'?2.7:st==='thinking'?1.9:st==='speaking'?2.1:1;
+      this.angle+=this.os*sp;
+      const dx=this.x-this.cx, dy=this.y-this.cy, dist=Math.sqrt(dx*dx+dy*dy);
+      const tr=this.r*(st==='listening'?1.17:st==='thinking'?.8:1);
+      const pull=(tr-dist)*.017;
+      this.vx+=(dx/dist)*pull+(Math.random()-.5)*.022;
+      this.vy+=(dy/dist)*pull+(Math.random()-.5)*.022;
+      this.vx*=.975; this.vy*=.975;
+      this.x+=this.vx; this.y+=this.vy;
+      if(this.life>this.maxLife)this.init();
+    }
+    draw(st) {
+      const t=this.life/this.maxLife, a=Math.min(t*5,1)*Math.min((1-t)*5,1);
+      const boost=st==='listening'?2.2:st==='thinking'?1.65:st==='speaking'?2:1;
+      const [r,g,b]=this.col;
+      ctx.beginPath(); ctx.arc(this.x,this.y,this.size*boost,0,Math.PI*2);
+      ctx.shadowBlur=6*boost; ctx.shadowColor=`rgba(${r},${g},${b},${a*.45})`;
+      ctx.fillStyle=`rgba(${r},${g},${b},${a*.65*boost})`; ctx.fill();
+      ctx.shadowBlur=0;
+    }
+  }
+
+  function initParticles(n=80) {
+    particles=[]; for(let i=0;i<n;i++){const p=new P();p.life=Math.random()*p.maxLife;particles.push(p);}
+  }
+
+  function animate() {
+    const s=canvas.width/(window.devicePixelRatio||1);
+    ctx.clearRect(0,0,s,s);
+    particles.forEach(p=>{p.update(currentState);p.draw(currentState);});
+    animId=requestAnimationFrame(animate);
+  }
+
+  // ORB IS THE TRUTH SURFACE — states must reflect reality
+  function setState(st) {
+    currentState = st;
+    const core=document.getElementById('orb-core');
+    const rings=document.querySelectorAll('.o-ring');
+    const status=document.getElementById('orb-status');
+    const dots=document.getElementById('think-dots');
+    const name=document.getElementById('orb-name');
+
+    const C = {
+      idle:      { bg:'radial-gradient(circle at 38% 33%, rgba(190,215,255,0.1) 0%, rgba(110,145,215,0.05) 38%, transparent 72%)', glow:'0 0 50px rgba(110,155,255,0.1), 0 0 100px rgba(90,125,215,0.05), inset 0 0 40px rgba(170,205,255,0.04)', ring:'rgba(130,170,255,0.08)', dur:'7s', txt: UI.isOpen()?'tap to close':'tap to speak', col:'var(--t3)', dots:false },
+      listening: { bg:'radial-gradient(circle at 38% 33%, rgba(70,150,255,0.26) 0%, rgba(55,125,235,0.12) 42%, transparent 78%)', glow:'0 0 80px rgba(70,150,255,0.36), 0 0 160px rgba(55,125,235,0.16), inset 0 0 60px rgba(130,185,255,0.1)', ring:'rgba(70,150,255,0.22)', dur:'2.5s', txt:'listening...', col:'rgba(110,185,255,0.6)', dots:false },
+      thinking:  { bg:'radial-gradient(circle at 38% 33%, rgba(150,100,255,0.2) 0%, rgba(120,78,235,0.09) 42%, transparent 78%)', glow:'0 0 70px rgba(140,95,255,0.28), 0 0 140px rgba(110,75,240,0.13), inset 0 0 50px rgba(170,140,255,0.08)', ring:'rgba(140,95,255,0.18)', dur:'3s', txt:'', col:'rgba(160,125,255,0.5)', dots:true },
+      speaking:  { bg:'radial-gradient(circle at 38% 33%, rgba(180,160,255,0.18) 0%, rgba(145,125,235,0.09) 42%, transparent 78%)', glow:'0 0 75px rgba(170,150,255,0.3), 0 0 150px rgba(140,125,240,0.14), inset 0 0 52px rgba(200,190,255,0.08)', ring:'rgba(170,150,255,0.16)', dur:'3.5s', txt:'speaking...', col:'rgba(195,175,255,0.5)', dots:false },
+    };
+
+    const cfg=C[st]||C.idle;
+    core.style.background=cfg.bg; core.style.boxShadow=cfg.glow;
+    rings.forEach(r=>{r.style.borderColor=cfg.ring;r.style.animationDuration=cfg.dur;});
+    status.textContent=cfg.txt; status.style.color=cfg.col;
+    dots.classList.toggle('on',cfg.dots);
+    name.style.color=st==='idle'?'rgba(150,185,255,0.28)':'rgba(170,205,255,0.4)';
+  }
+
+  // Speech display
+  let speechTimer;
+  function showSpeech(text) {
+    const el=document.getElementById('speech-wrap');
+    document.getElementById('speech-txt').textContent=text;
+    el.classList.add('on');
+    clearTimeout(speechTimer);
+    speechTimer=setTimeout(hideSpeech, Math.max(4500,text.length*60));
+  }
+  function hideSpeech() { document.getElementById('speech-wrap').classList.remove('on'); }
+
+  return { init:initParticles, resize, animate, setState, showSpeech, hideSpeech };
+})();
+
+// ─── PANEL MODULE — orb transformation system ─────────────────
+const Panel = {
+  _open: false,
+
+  async open(type) {
+    if (State.mode !== 'normal') return;
+
+    const panel = document.getElementById('orb-panel');
+    const title = document.getElementById('panel-title');
+    const typed = document.getElementById('panel-typed');
+    const list  = document.getElementById('panel-list');
+    const acts  = document.getElementById('panel-actions');
+
+    // Clear
+    typed.textContent=''; list.innerHTML=''; acts.innerHTML='';
+    this._open = true;
+
+    // Transform: orb → panel
+    panel.classList.add('open');
+
+    const titles = { summary:'Daily Summary', recall:'Commitments', regulate:'Priority Focus', 'one-thing':'Your One Thing' };
+    title.textContent = titles[type] || 'Frida';
+
+    Orb.setState('thinking');
+
+    if (type === 'summary') await this._summary(typed, list, acts);
+    else if (type === 'recall') await this._recall(list, acts);
+    else if (type === 'regulate') await this._regulate(typed, list, acts);
+    else if (type === 'one-thing') await this._oneThing(typed, acts);
+
+    Orb.setState('idle');
+  },
+
+  close() {
+    document.getElementById('orb-panel').classList.remove('open');
+    this._open = false;
+    Orb.setState(State.listening ? 'listening' : 'idle');
+  },
+
+  isOpen() { return this._open; },
+
+  // Typed text animation — Frida renders while thinking
+  async _type(el, text, delay=18) {
+    el.textContent='';
+    for (const ch of text) {
+      el.textContent += ch;
+      await new Promise(r=>setTimeout(r, ch==='.'||ch==='!'||ch==='?'?120:delay));
+    }
+  },
+
+  async _summary(typed, list, acts) {
+    const pending = State.tasks.filter(t=>!t.done).slice(0,5);
+    const done    = State.tasks.filter(t=>t.done).length;
+    const total   = State.tasks.length;
+
+    if (State.apiKey) {
+      const ctx = `Tasks pending: ${pending.map(t=>t.text).join(', ') || 'none'}. Tasks done today: ${done}/${total}. Give a warm 1-2 sentence daily summary and what matters most right now.`;
+      const r = await AI.call(ctx, false);
+      if (r) await this._type(typed, AI.parseCommits(r));
+    } else {
+      await this._type(typed, `${done} things done. ${pending.length} pending. Here's what's on your plate.`);
+    }
+
+    pending.slice(0,4).forEach((t,i) => {
+      const el = document.createElement('div');
+      el.className = `panel-item${t.priority==='high'?' pi-priority-high':''}`;
+      el.style.animationDelay = (i*0.08)+'s';
+      el.innerHTML = `<div class="pi-dot"></div><div><div class="pi-text">${Security.sanitize(t.text)}</div>${t.time?`<div class="pi-meta">${t.time}</div>`:''}</div>`;
+      el.onclick = () => { el.classList.toggle('done'); t.done=!t.done; Storage.set('tasks',State.tasks); };
+      list.appendChild(el);
     });
 
-    device.addEventListener('gattserverdisconnected', () => {
-      fdpLog(`[BLE] ${device.name} disconnected`, 'sys');
-      document.getElementById('ble-status').textContent='Scan'; document.getElementById('ble-status').className='conn-status off';
+    acts.innerHTML = `<button class="panel-btn primary" onclick="Panel.close();UI.subMode('regulate')">Focus Mode</button><button class="panel-btn" onclick="Panel.close()">Done</button>`;
+  },
+
+  async _recall(list, acts) {
+    const commits = State.commitments.slice(0,5);
+    if (!commits.length) {
+      document.getElementById('panel-typed').textContent = 'No commitments logged yet. Tell Frida what you need to remember.';
+      acts.innerHTML = `<button class="panel-btn primary" onclick="Panel.close()">Got it</button>`;
+      return;
+    }
+    commits.forEach((c,i) => {
+      const el = document.createElement('div');
+      el.className = `panel-item${c.priority==='high'?' pi-priority-high':''}`;
+      el.style.animationDelay = (i*0.09)+'s';
+      el.innerHTML = `<div class="pi-dot"></div><div><div class="pi-text">${Security.sanitize(c.text)}</div>${c.time?`<div class="pi-meta">${c.time}</div>`:''}</div>`;
+      el.onclick = () => { el.classList.toggle('done'); c.done=!c.done; Storage.set('commits',State.commitments); };
+      list.appendChild(el);
     });
-    setMode('bio');
-  } catch(e) {
-    fdpLog(`[BLE] Error: ${e.message}`, 'sys');
-    document.getElementById('ble-status').textContent='Scan'; document.getElementById('ble-status').className='conn-status off';
+    acts.innerHTML = `<button class="panel-btn" onclick="Panel.close()">Close</button>`;
+  },
+
+  async _regulate(typed, list, acts) {
+    const high = State.tasks.filter(t=>!t.done&&t.priority==='high').slice(0,3);
+    const any  = State.tasks.filter(t=>!t.done).slice(0,3);
+    const show = high.length ? high : any;
+
+    if (State.apiKey && show.length) {
+      const ctx = `Regulate mode. Tasks: ${show.map(t=>t.text).join(', ')}. Name the single most important one and why in 1 sentence.`;
+      const r = await AI.call(ctx, false);
+      if (r) await this._type(typed, AI.parseCommits(r));
+    }
+
+    show.slice(0,3).forEach((t,i)=>{
+      const el=document.createElement('div');
+      el.className=`panel-item${t.priority==='high'?' pi-priority-high':''}`;
+      el.style.animationDelay=(i*.09)+'s';
+      el.innerHTML=`<div class="pi-dot"></div><div class="pi-text">${Security.sanitize(t.text)}</div>`;
+      el.onclick=()=>{el.classList.toggle('done');t.done=!t.done;Storage.set('tasks',State.tasks);};
+      list.appendChild(el);
+    });
+    acts.innerHTML=`<button class="panel-btn primary" onclick="Panel.close()">Got it</button>`;
+  },
+
+  async _oneThing(typed, acts) {
+    const pending = State.tasks.filter(t=>!t.done).slice(0,8);
+    let action = 'Take one slow breath and look around the room.';
+
+    if (State.apiKey) {
+      const ctx = `One-thing launcher. Tasks available: ${pending.map(t=>t.text).join(', ')||'none'}. Give ONE single smallest physical next action. One sentence. Certain.`;
+      const r = await AI.call(ctx, false);
+      if (r) action = AI.parseCommits(r).split(/[.!?]/)[0].trim() || action;
+    }
+
+    // One-thing card
+    const card = document.createElement('div');
+    card.className = 'one-thing-card';
+    card.innerHTML = `<div class="ot-label">⚡ Your One Thing</div><div class="ot-text" id="ot-txt"></div>`;
+    document.getElementById('panel-list').appendChild(card);
+    await this._type(document.getElementById('ot-txt'), action);
+    acts.innerHTML = `<button class="panel-btn primary" onclick="Panel.close()">On it</button>`;
+  },
+};
+
+// ─── ENGINE (NeuroForge state machine) ───────────────────────
+const Engine = {
+  // setMode — SINGLE source of truth for all state changes
+  // UI never controls state independently
+  setMode(newMode, source='user') {
+    const curr = State.mode;
+
+    // ILLEGAL: overload → normal (must pass through recovery)
+    if (curr === 'overload' && newMode === 'normal') {
+      console.warn('[NeuroForge] Blocked: overload → normal. Must pass through recovery.');
+      return false;
+    }
+
+    State.mode = newMode;
+    Storage.set('mode', newMode);
+    UI.renderMode(newMode, source); // renderMode is the ONLY UI authority
+    return true;
+  },
+
+  async triggerOverload(source='user') {
+    if (State.mode === 'overload') return;
+    Voice.stopListen();
+    Panel.close();
+    this.setMode('overload', source);
+
+    // Grounding message from Frida
+    if (State.apiKey && !State.privacy) {
+      Orb.setState('thinking');
+      const r = await AI.call(`Still Water activated${source==='bio'?' by biometric spike':''}.Give one warm grounding sentence only.`, false);
+      if (r) { document.getElementById('sw-frida-msg').textContent=r; Orb.setState('speaking'); await Voice.speak(r); Orb.setState('idle'); }
+    }
+    // Show exit after 30s — cannot rush recovery
+    setTimeout(()=>document.getElementById('sw-exit').classList.add('show'), 30000);
+  },
+
+  async exitOverload() {
+    this.setMode('recovery', 'user');
+    document.getElementById('sw-exit').classList.remove('show');
+
+    if (State.apiKey && !State.privacy) {
+      Orb.setState('thinking');
+      const pending = State.tasks.filter(t=>!t.done).slice(0,5).map(t=>t.text).join(', ') || 'nothing specific';
+      const r = await AI.call(`Recovery mode. Just left Still Water. Context: ${pending}. ONE single smallest physical next action. One sentence. Certain.`, false);
+      if (r) {
+        const clean = AI.parseCommits(r);
+        document.getElementById('rec-action').textContent = clean.split(/[.!?]/)[0].trim() || clean;
+        Orb.setState('speaking'); await Voice.speak(clean); Orb.setState('idle');
+      }
+    } else {
+      document.getElementById('rec-action').textContent = 'Take one slow breath and look around the room.';
+    }
+  },
+
+  completeRecovery() {
+    // Recovery → Normal is LEGAL
+    if (State.mode !== 'recovery') return;
+    this.setMode('normal', 'user');
+  },
+
+  acknowledgeAlert() {
+    document.getElementById('bio-alert').classList.remove('on');
+    this.triggerOverload('bio');
+  },
+
+  killSwitch() {
+    // Fix 8: Complete kill switch — terminates ALL active behavior
+    // Stop mic recognition
+    Voice.stopListen();
+    State.voiceActive = false;
+    if (Voice._inputRec) { try{Voice._inputRec.stop();}catch(e){} }
+    State.listening = false;
+
+    // Cancel speech synthesis
+    window.speechSynthesis?.cancel();
+
+    // Clear bio debounce timer
+    clearTimeout(BioHook._debounce);
+    BioHook._debounce = null;
+
+    // Close panel
+    Panel.close();
+
+    // Close any open overlays
+    document.getElementById('settings-ov').classList.remove('on');
+    document.getElementById('bio-alert').classList.remove('on');
+
+    // Clear think dots and processing state
+    document.getElementById('think-dots').classList.remove('on');
+
+    // Return orb to idle
+    Orb.setState('idle');
+    Orb.hideSpeech();
+
+    // Visual feedback
+    document.getElementById('kill-btn').style.color='rgba(255,130,130,0.9)';
+    document.getElementById('kill-btn').style.borderColor='rgba(248,80,80,0.3)';
+    setTimeout(()=>{
+      document.getElementById('kill-btn').style.color='';
+      document.getElementById('kill-btn').style.borderColor='';
+    },900);
+  },
+};
+
+// ─── UI MODULE (renderMode is the ONLY authority) ────────────
+const UI = (() => {
+  let uiOpen = false;
+
+  // renderMode — called only by Engine.setMode
+  function renderMode(mode, source) {
+    const badge = document.getElementById('mode-badge');
+
+    if (mode === 'overload') {
+      document.getElementById('still-water').classList.add('on');
+      document.getElementById('recovery-panel').classList.remove('on');
+      document.getElementById('ghost-ui').classList.remove('on');
+      uiOpen = false;
+      Orb.setState('idle');
+      document.getElementById('orb-name').style.color='rgba(120,210,170,0.28)';
+      document.getElementById('orb-status').textContent='still water';
+      badge.textContent='Overload'; badge.style.color='rgba(248,120,120,0.7)';
+      badge.style.background='rgba(248,80,80,0.07)'; badge.style.borderColor='rgba(248,80,80,0.2)';
+      return;
+    }
+    if (mode === 'recovery') {
+      document.getElementById('still-water').classList.remove('on');
+      document.getElementById('recovery-panel').classList.add('on');
+      document.getElementById('ghost-ui').classList.remove('on');
+      uiOpen = false;
+      Orb.setState('idle');
+      document.getElementById('orb-name').style.color='rgba(120,210,170,0.3)';
+      document.getElementById('orb-status').textContent='recovery';
+      badge.textContent='Recovery'; badge.style.color='rgba(120,210,170,0.7)';
+      badge.style.background='rgba(90,180,140,0.06)'; badge.style.borderColor='rgba(90,180,140,0.2)';
+      return;
+    }
+    if (mode === 'normal') {
+      document.getElementById('still-water').classList.remove('on');
+      document.getElementById('recovery-panel').classList.remove('on');
+      document.getElementById('sw-exit').classList.remove('show');
+      document.getElementById('orb-name').style.color='rgba(150,185,255,0.28)';
+      Orb.setState(State.listening?'listening':'idle');
+      badge.textContent='Normal'; badge.style.color='rgba(140,180,255,0.5)';
+      badge.style.background='rgba(100,140,255,0.05)'; badge.style.borderColor='rgba(140,180,255,0.16)';
+      if (uiOpen) document.getElementById('ghost-ui').classList.add('on');
+      return;
+    }
+  }
+
+  function orbTap() {
+    if (State.mode === 'overload' || State.mode === 'recovery') return;
+    if (Panel.isOpen()) { Panel.close(); return; }
+    if (State.listening) { Voice.stopListen(); return; }
+
+    uiOpen = !uiOpen;
+    document.getElementById('ghost-ui').classList.toggle('on', uiOpen);
+
+    if (uiOpen) {
+      if (!State.apiKey) { Onboarding.show(); return; }
+      if (!State.privacy) Voice.startListen();
+    } else {
+      Voice.stopListen(); Orb.hideSpeech();
+    }
+    Orb.setState(uiOpen && !State.privacy ? 'listening' : 'idle');
+  }
+
+  function subMode(m) {
+    State.subMode = m;
+    document.querySelectorAll('.qs-pill').forEach(p=>p.classList.toggle('on',p.dataset.m===m));
+    const ph = { ambient:'Say something to Frida...', regulate:'What needs attention?', bio:'Ask about your biometrics...' };
+    document.getElementById('txt-in').placeholder = ph[m] || 'Say something to Frida...';
+  }
+
+  async function send() {
+    const inp = document.getElementById('txt-in');
+    const raw = inp.value.trim(); if (!raw) return;
+    if (!State.apiKey) { Onboarding.show(); return; }
+    if (State.privacy) return;
+    inp.value='';
+
+    let ctx='';
+    if (State.mode==='overload')     ctx='Mode: STILL WATER. One warm grounding sentence only. No tasks. ';
+    else if (State.mode==='recovery') ctx='Mode: RECOVERY. ONE single physical next action. One sentence. Certain. ';
+    else if (State.subMode==='regulate') {
+      const tl=State.tasks.filter(t=>!t.done).slice(0,5).map(t=>t.text).join(', ')||'none';
+      ctx=`Mode: REGULATE. Tasks: ${tl}. `;
+    }
+    else if (State.subMode==='bio') ctx=`Mode: BIO. HR:${State.bio.hr??'?'} HRV:${State.bio.hrv??'?'} Stress:${State.bio.stress??'?'}. ADHD lens. No diagnosis. `;
+
+    Orb.setState('thinking');
+    const r = await AI.call(ctx+raw, true);
+    if (!r) { Orb.setState(State.listening?'listening':'idle'); return; }
+
+    const clean = AI.parseCommits(r);
+    Orb.showSpeech(clean);
+    Orb.setState('speaking');
+    await Voice.speak(clean);
+    Orb.setState(State.listening?'listening':'idle');
+
+    if (State.mode==='recovery') document.getElementById('rec-action').textContent=clean.split(/[.!?]/)[0].trim()||clean;
+  }
+
+  function addChip(text) {
+    const stream = document.getElementById('commit-stream');
+    const el = document.createElement('div');
+    el.className='commit-chip'; el.textContent='⚡ '+Security.sanitize(text);
+    stream.appendChild(el);
+    if (stream.children.length>3) stream.removeChild(stream.firstChild);
+    setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity 1s';},7000);
+    setTimeout(()=>el.remove(),8200);
+  }
+
+  function openSettings() {
+    const ov=document.getElementById('settings-ov'); ov.classList.add('on');
+    selProv(State.provider); selVoice(State.voiceEngine);
+    const stored=Storage.get(`key_${State.provider}`)||State.apiKey;
+    const ki=document.getElementById('sh-key'); ki.value=stored?'••••••••••••':''; ki.dataset.p='1';
+    document.getElementById('sh-privacy-t').classList.toggle('on',State.privacy);
+    document.getElementById('sh-bio-t').classList.toggle('on',State.bioEnabled);
+  }
+
+  function selProv(p) {
+    State.provider=p;
+    document.querySelectorAll('#sh-prov-grid .ob-prov').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
+    const stored=Storage.get(`key_${p}`)||'';
+    const ki=document.getElementById('sh-key'); ki.value=stored?'••••••••••••':''; ki.placeholder=Providers[p].ph;
+  }
+
+  function selVoice(v) {
+    State.voiceEngine=v;
+    document.querySelectorAll('#sh-voice-grid .ob-prov').forEach(t=>t.classList.toggle('on',t.dataset.v===v));
+    const needs=v==='openai-tts'||v==='elevenlabs';
+    document.getElementById('sh-tts-key').classList.toggle('hidden',!needs);
+  }
+
+  function clearKey() {
+    if (!confirm('Clear your saved API key? You will need to re-enter it.')) return;
+    State.apiKey = '';
+    Storage.del('key');
+    Object.keys(localStorage).filter(k=>k.startsWith('fn3_key')).forEach(k=>localStorage.removeItem(k));
+    document.getElementById('sh-key').value = '';
+    document.getElementById('sh-key').placeholder = 'Paste key...';
+  }
+
+  function saveSettings() {
+    const ki=document.getElementById('sh-key');
+    const key=ki.dataset.p==='1'&&ki.value==='••••••••••••'
+      ? Storage.get(`key_${State.provider}`)||State.apiKey
+      : ki.value.trim();
+    if (key) { State.apiKey=key; Storage.set('key',key); Storage.set(`key_${State.provider}`,key); Storage.set('provider',State.provider); }
+    const tki=document.getElementById('sh-tts-key');
+    if (tki.value&&tki.value!=='••••••••••••') { State.ttsKey=tki.value.trim(); Storage.set('tts_key',State.ttsKey); }
+    Storage.set('voice',State.voiceEngine);
+    document.getElementById('settings-ov').classList.remove('on');
+  }
+
+  document.getElementById('settings-ov').addEventListener('click',e=>{ if(e.target===document.getElementById('settings-ov')) document.getElementById('settings-ov').classList.remove('on'); });
+
+  return { renderMode, orbTap, subMode, send, addChip, openSettings, selProv, selVoice, saveSettings, clearKey, isOpen:()=>uiOpen };
+})();
+
+// ─── SESSION LOCK ─────────────────────────────────────────────
+const SessionLock = {
+  _pin: '',
+  _inactivityTimer: null,
+  _inactivityMs: 5 * 60 * 1000, // 5 min
+
+  build() {
+    const kp=document.getElementById('sl-keypad');
+    [1,2,3,4,5,6,7,8,9].forEach(n=>{
+      const b=document.createElement('button'); b.className='sl-key'; b.textContent=n;
+      b.onclick=()=>this.press(n.toString()); kp.appendChild(b);
+    });
+    const del=document.createElement('button'); del.className='sl-key'; del.textContent='⌫';
+    del.onclick=()=>this.press('del'); kp.appendChild(del);
+    const z=document.createElement('button'); z.className='sl-key'; z.textContent='0';
+    z.onclick=()=>this.press('0'); kp.appendChild(z);
+  },
+
+  press(k) {
+    if (k==='del') { this._pin=this._pin.slice(0,-1); }
+    else { if (this._pin.length>=4) return; this._pin+=k; }
+    const dots=document.querySelectorAll('.sl-dot');
+    dots.forEach((d,i)=>d.classList.toggle('filled',i<this._pin.length));
+    if (this._pin.length===4) setTimeout(()=>this.check(),200);
+  },
+
+  check() {
+    const stored=Storage.get('pin');
+    if (this._pin===stored) { this.unlock(); }
+    else {
+      this._pin='';
+      document.querySelectorAll('.sl-dot').forEach(d=>d.classList.remove('filled'));
+      document.getElementById('session-lock').style.animation='fade-in .3s ease';
+    }
+  },
+
+  lock() { document.getElementById('session-lock').classList.add('on'); this._pin=''; },
+  unlock() { document.getElementById('session-lock').classList.remove('on'); this.resetInactivity(); },
+
+  resetInactivity() {
+    if (!State.pinEnabled) return;
+    clearTimeout(this._inactivityTimer);
+    this._inactivityTimer=setTimeout(()=>this.lock(), this._inactivityMs);
+  },
+
+  togglePin() {
+    State.pinEnabled=!State.pinEnabled;
+    document.getElementById('sh-pin-t').classList.toggle('on',State.pinEnabled);
+    Storage.set('pin_enabled',State.pinEnabled);
+    if (State.pinEnabled && !Storage.get('pin')) {
+      const p=prompt('Set a 4-digit PIN:');
+      if (p && /^\d{4}$/.test(p)) { Storage.set('pin',p); Storage.set('pin_enabled',true); }
+      else { State.pinEnabled=false; document.getElementById('sh-pin-t').classList.remove('on'); }
+    }
+  },
+};
+
+// ─── ONBOARDING ───────────────────────────────────────────────
+const Onboarding = {
+  _provider: 'groq',
+
+  show() { document.getElementById('onboarding').classList.add('on'); },
+  hide() { document.getElementById('onboarding').classList.remove('on'); },
+
+  toggleAdvanced() {
+    const adv=document.getElementById('ob-advanced');
+    adv.classList.toggle('on');
+  },
+
+  selProv(p) {
+    this._provider=p; State.provider=p;
+    document.querySelectorAll('#ob-advanced .ob-prov').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
+    document.getElementById('ob-key').placeholder=Providers[p].ph;
+  },
+
+  async launchInstant() {
+    // Shared beta access — user meets Frida immediately
+    // In production this would use a shared relay key
+    // For beta: redirect to advanced with a friendly message
+    document.getElementById('ob-advanced').classList.add('on');
+    const ob1=document.getElementById('ob-step-1');
+    ob1.querySelector('.ob-sub').textContent='Great! Just paste your free API key below to activate Frida. Groq is free and takes 30 seconds to set up at console.groq.com';
+    document.getElementById('ob-launch-btn').style.display='none';
+    ob1.querySelector('.ob-launch-label').textContent='';
+  },
+
+  saveKey() {
+    const key=document.getElementById('ob-key').value.trim();
+    if (!key) return;
+    State.apiKey=key; State.provider=this._provider;
+    Storage.set('key',key); Storage.set(`key_${this._provider}`,key); Storage.set('provider',this._provider);
+
+    // Move to step 2 — meet Frida
+    document.getElementById('ob-step-1').classList.remove('on');
+    document.getElementById('ob-step-2').classList.add('on');
+
+    // Frida greets
+    this.greet();
+  },
+
+  async greet() {
+    const msg=document.getElementById('ob-greeting-msg');
+    msg.textContent='Just a moment...';
+    if (State.apiKey) {
+      const h=new Date().getHours();
+      const r=await AI.call(`Jeff just set up Frida for the first time. It's ${h<12?'morning':h<17?'afternoon':'evening'}. Greet him warmly in 1 sentence. Be present and human.`,false);
+      if (r) { const c=AI.parseCommits(r); msg.textContent=c; Voice.speak(c); }
+      else msg.textContent='I\'m glad you\'re here. Let\'s figure this out together.';
+    } else {
+      msg.textContent='I\'m glad you\'re here. Let\'s figure this out together.';
+    }
+  },
+
+  complete() {
+    this.hide();
+    Storage.set('onboarded',true);
+    UI.subMode('ambient');
+    // Auto-open UI
+    document.getElementById('orb-wrap').click();
+  },
+};
+
+// ─── FDP — Frida Device Protocol (public) ───────────────────
+window.FDP = {
+  ingest(payload) { BioHook.ingest(payload); },
+  demo: {
+    _iv: null,
+    start() {
+      if (this._iv) return;
+      let base=72, trend=0;
+      this._iv=setInterval(()=>{
+        trend+=(Math.random()-.45)*3.5; trend=Math.max(-20,Math.min(65,trend));
+        window.FDP.ingest({
+          hr:    Math.round(Math.max(50,  Math.min(165,  base+trend+(Math.random()-.5)*3))),
+          hrv:   Math.round(Math.max(8,   Math.min(80,   38-trend*.5+(Math.random()-.5)*4))),
+          stress:Math.round(Math.max(0,   Math.min(100,  28+trend*.65+(Math.random()-.5)*8))),
+        });
+      },2000);
+    },
+    stop() { clearInterval(this._iv); this._iv=null; },
+  },
+};
+
+// ─── CROSS-PLATFORM COMPATIBILITY ────────────────────────────
+
+const Platform = (() => {
+  const ua = navigator.userAgent;
+  const isIOS     = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const isSafari  = /^((?!chrome|android).)*safari/i.test(ua);
+  const isAndroid = /Android/.test(ua);
+  const isChrome  = /Chrome/.test(ua) && !isSafari;
+  const isPWA     = window.matchMedia('(display-mode: fullscreen)').matches
+                 || window.navigator.standalone === true;
+
+  // iOS Safari has limited Web Speech API — continuous mode often fails
+  // Patch: use shorter segments and restart more aggressively
+  const hasSpeechRecognition = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+  const hasContinuousSpeech  = hasSpeechRecognition && !isIOS; // iOS Safari: no reliable continuous
+
+  // AudioContext must be unlocked by user gesture on iOS
+  let audioUnlocked = false;
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = ctx.createBuffer(1,1,22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.connect(ctx.destination); src.start(0);
+    ctx.resume().then(() => { audioUnlocked = true; });
+  }
+  document.addEventListener('touchstart', unlockAudio, { once:true, passive:true });
+  document.addEventListener('click',      unlockAudio, { once:true, passive:true });
+
+  // iOS Safari speechSynthesis workaround — voices load async
+  // and speaking fails silently if called before voices are ready
+  let voicesReady = false;
+  function ensureVoices() {
+    return new Promise(res => {
+      if (voicesReady || !('speechSynthesis' in window)) { res(); return; }
+      const vs = window.speechSynthesis.getVoices();
+      if (vs.length > 0) { voicesReady=true; res(); return; }
+      window.speechSynthesis.onvoiceschanged = () => { voicesReady=true; res(); };
+      setTimeout(res, 1500); // fallback
+    });
+  }
+
+  // Show PWA install hint for Safari users (iOS install is share → Add to Home Screen)
+  function showInstallHint() {
+    if (isPWA || !isIOS || !isSafari) return;
+    if (Storage.get('install_hint_dismissed')) return;
+    const hint = document.createElement('div');
+    hint.id = 'install-hint';
+    hint.style.cssText = `position:fixed;bottom:calc(env(safe-area-inset-bottom,20px) + 80px);left:50%;transform:translateX(-50%);background:rgba(10,12,30,0.92);border:1px solid rgba(140,180,255,0.2);border-radius:16px;padding:12px 18px;font-family:'Jost',sans-serif;font-size:11px;font-weight:300;color:rgba(180,210,255,0.75);text-align:center;z-index:600;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);white-space:nowrap;letter-spacing:.3px;box-shadow:0 8px 24px rgba(0,0,10,0.4);`;
+    hint.innerHTML = `Tap <strong style="color:rgba(140,180,255,0.9)">Share</strong> → <strong style="color:rgba(140,180,255,0.9)">Add to Home Screen</strong> to install Frida`;
+    const close = document.createElement('span');
+    close.textContent=' ✕';
+    close.style.cssText='cursor:pointer;opacity:.5;margin-left:8px;';
+    close.onclick = () => { hint.remove(); Storage.set('install_hint_dismissed',true); };
+    hint.appendChild(close);
+    document.body.appendChild(hint);
+    setTimeout(()=>{ if(hint.parentNode){hint.style.opacity='0';hint.style.transition='opacity 1s';setTimeout(()=>hint.remove(),1000);} },8000);
+  }
+
+  return { isIOS, isSafari, isAndroid, isChrome, isPWA, hasSpeechRecognition, hasContinuousSpeech, ensureVoices, showInstallHint };
+})();
+
+// iOS-aware voice patch — wrap the speak function
+const _originalSpeak = Voice.speak.bind(Voice);
+Voice.speak = async function(text) {
+  await Platform.ensureVoices();
+  // iOS Safari: cancel any pending speech first to prevent queue buildup
+  if (Platform.isIOS) window.speechSynthesis?.cancel();
+  return _originalSpeak(text);
+};
+
+// iOS Safari: Web Speech continuous mode workaround
+// On iOS, continuous=true often stops after ~60s
+// Patch startListen to restart more aggressively
+if (Platform.isIOS && !Platform.hasContinuousSpeech) {
+  const _origStart = Voice.startListen.bind(Voice);
+  Voice.startListen = function() {
+    // On iOS we use non-continuous mode with auto-restart
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+    if (State.listening || State.privacy) return;
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    Voice._listenRec = new SR();
+    Voice._listenRec.continuous     = false; // iOS doesn't support reliable continuous
+    Voice._listenRec.interimResults = false; // iOS: interim results unreliable
+    Voice._listenRec.lang           = 'en-US';
+    Voice._listenRec.maxAlternatives= 1;
+
+    Voice._listenRec.onstart = () => {
+      State.listening = true;
+      Orb.setState('listening');
+      document.getElementById('btn-mic').classList.add('rec');
+      document.getElementById('btn-mic').textContent = '⏹️';
+    };
+
+    Voice._listenRec.onresult = e => {
+      const transcript = e.results[0]?.[0]?.transcript || '';
+      if (transcript.trim().split(' ').length >= 4) {
+        Voice.processAmbient(transcript.trim());
+      }
+    };
+
+    Voice._listenRec.onend = () => {
+      // Auto-restart on iOS if still supposed to be listening
+      if (State.listening && !State.privacy) {
+        setTimeout(() => { try { Voice._listenRec.start(); } catch(e){} }, 300);
+      }
+    };
+
+    Voice._listenRec.onerror = e => {
+      if (e.error === 'no-speech' && State.listening) {
+        setTimeout(() => { try { Voice._listenRec.start(); } catch(e){} }, 500);
+      } else if (e.error !== 'aborted') {
+        Voice.stopListen();
+      }
+    };
+
+    try { Voice._listenRec.start(); } catch(e) { Voice.stopListen(); }
+  };
+}
+
+// Android: patch for Samsung Internet browser (older WebView compatibility)
+if (Platform.isAndroid) {
+  // Ensure backdrop-filter is supported, add fallback background if not
+  const testEl = document.createElement('div');
+  testEl.style.backdropFilter = 'blur(1px)';
+  if (!testEl.style.backdropFilter && !testEl.style.webkitBackdropFilter) {
+    // No backdrop-filter support — add darker backgrounds as fallback
+    const style = document.createElement('style');
+    style.textContent = `
+      #ghost-ui #input-row #txt-in { background: rgba(10,12,30,0.95) !important; }
+      .qs-pill { background: rgba(10,12,30,0.9) !important; }
+      #orb-panel { background: rgba(4,6,18,0.98) !important; }
+      #still-water, #recovery-panel, #onboarding { background: rgba(0,0,8,0.99) !important; }
+    `;
+    document.head.appendChild(style);
   }
 }
 
-// ═══════════════════════════════════════════
-// SHORTCUTS GUIDE
-// ═══════════════════════════════════════════
-function openShortcutsGuide()  { document.getElementById('sc-modal').classList.add('open'); }
-function closeShortcutsGuide() { document.getElementById('sc-modal').classList.remove('open'); }
-document.getElementById('sc-modal').addEventListener('click',e=>{ if(e.target===document.getElementById('sc-modal')) closeShortcutsGuide(); });
+// ─── CLOCK ───────────────────────────────────────────────────
+function tick() {
+  const n=new Date();
+  document.getElementById('sb-time').textContent=`${n.getHours().toString().padStart(2,'0')}:${n.getMinutes().toString().padStart(2,'0')}`;
+}
+setInterval(tick,1000); tick();
 
-// ═══════════════════════════════════════════
-// KEYBOARD
-// ═══════════════════════════════════════════
-document.getElementById('txt-in').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();sendMsg();} });
+// ─── KEYBOARD ────────────────────────────────────────────────
+document.getElementById('txt-in').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();UI.send();} });
 
-// ═══════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════
-function init() {
-  renderTasks(); updateNext();
-  document.getElementById('thr-hr').textContent     = S.thresholds.hr;
-  document.getElementById('thr-stress').textContent  = S.thresholds.stress;
-  document.getElementById('thr-hrv').textContent     = S.thresholds.hrv;
-  document.getElementById('thresh-display').textContent = S.thresholds.hr;
+// ─── PREVENT PULL-TO-REFRESH ─────────────────────────────────
+document.addEventListener('touchmove',e=>{
+  if(!e.target.closest('#txt-in')&&!e.target.closest('.sh-sheet')&&!e.target.closest('#ob-advanced')) e.preventDefault();
+},{passive:false});
 
-  if (S.apiKey) {
-    const prov = PROVIDERS[S.provider];
-    document.getElementById('key-btn').textContent = `${prov.name} ✓`;
-    document.getElementById('key-btn').style.color = '#2ec4a9';
+// ─── INACTIVITY RESET ────────────────────────────────────────
+['touchstart','click','keydown'].forEach(ev=>document.addEventListener(ev,()=>SessionLock.resetInactivity(),{passive:true}));
+
+// ─── PWA MANIFEST ────────────────────────────────────────────
+const mf={name:'Frida · NeuroForge',short_name:'Frida',display:'fullscreen',orientation:'portrait',start_url:'.',background_color:'#000008',theme_color:'#000008',icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%23000008'/%3E%3Ccircle cx='96' cy='96' r='52' fill='none' stroke='rgba(130,170,255,0.45)' stroke-width='1'/%3E%3Ccircle cx='96' cy='96' r='26' fill='rgba(110,150,240,0.1)'/%3E%3C/svg%3E",sizes:'192x192',type:'image/svg+xml'}]};
+const lk=document.createElement('link');lk.rel='manifest';lk.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:'application/json'}));document.head.appendChild(lk);
+
+// ─── INIT ─────────────────────────────────────────────────────
+(function init() {
+  Orb.resize();
+  Orb.init(82);
+  Orb.animate();
+  SessionLock.build();
+
+  if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
+
+  // Restore state
+  const onboarded = Storage.get('onboarded');
+  if (!onboarded || !State.apiKey) {
+    Onboarding.show();
   } else {
-    setTimeout(openKeyModal, 1200);
+    Engine.setMode('normal','init');
+    document.getElementById('mode-badge').textContent=Providers[State.provider]?.name||'Normal';
+    document.getElementById('orb-status').textContent='tap to speak';
+    if (State.privacy) {
+    document.getElementById('privacy-badge-top').classList.add('on');
+    document.getElementById('privacy-badge-main').classList.add('on');
+  }
   }
 
-  document.addEventListener('touchmove', e=>{
-    if (!e.target.closest('#scroll')&&!e.target.closest('#txt-in')&&!e.target.closest('.ksheet')&&!e.target.closest('.sc-sheet')) e.preventDefault();
-  }, { passive:false });
+  // Session lock check
+  if (State.pinEnabled && Storage.get('pin')) SessionLock.lock();
 
-  // PWA manifest
-  const mf = { name:"Frida", short_name:"Frida", description:"Your executive function, amplified", start_url:".", display:"fullscreen", orientation:"portrait", background_color:"#060912", theme_color:"#060912", icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%23060912'/%3E%3Ctext y='130' x='96' text-anchor='middle' font-size='110'%3E🌸%3C/text%3E%3C/svg%3E",sizes:"192x192",type:"image/svg+xml"}] };
-  const lk = document.createElement('link'); lk.rel='manifest'; lk.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:'application/json'})); document.head.appendChild(lk);
-}
-
-init();
+  // iOS: show install hint after 3s
+  setTimeout(() => Platform.showInstallHint(), 3000);
+})();
 </script>
 </body>
 </html>
